@@ -1,0 +1,174 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`#analyzeOas > should analyze an OpenAPI definition 1`] = `
+{
+  "general": {
+    "dereferencedFileSize": {
+      "found": 0.03,
+      "name": "Dereferenced File Size",
+    },
+    "mediaTypes": {
+      "found": [
+        "application/json",
+        "application/x-www-form-urlencoded",
+        "application/xml",
+        "multipart/form-data",
+      ],
+      "name": "Media Type",
+    },
+    "operationTotal": {
+      "found": 20,
+      "name": "Operation",
+    },
+    "rawFileSize": {
+      "found": 0.01,
+      "name": "Raw File Size",
+    },
+    "securityTypes": {
+      "found": [
+        "apiKey",
+        "oauth2",
+      ],
+      "name": "Security Type",
+    },
+  },
+  "openapi": {
+    "additionalProperties": {
+      "description": "additionalProperties allows you to document dictionaries where the keys are user-supplied strings.",
+      "locations": [
+        "#/paths/~1store~1inventory/get/responses/200/content/application~1json/schema/additionalProperties",
+      ],
+      "present": true,
+      "url": {
+        "3.0": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md#schema-object",
+        "3.1": "https://json-schema.org/understanding-json-schema/reference/object.html#additional-properties",
+      },
+    },
+    "callbacks": {
+      "description": "Callbacks are asynchronous, out-of-band requests that your service will send to some other service in response to certain events.",
+      "locations": [],
+      "present": false,
+      "url": {
+        "3.0": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md#callback-object",
+        "3.1": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.1.md#callback-object",
+      },
+    },
+    "circularRefs": {
+      "description": "Circular references are $ref pointers that at some point in their lineage reference themselves.",
+      "locations": [],
+      "present": false,
+    },
+    "commonParameters": {
+      "description": "Common parameters allow you to define parameters that are shared across multiple operations within your API.",
+      "locations": [],
+      "present": false,
+      "url": {
+        "3.0": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md#path-item-object",
+        "3.1": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.1.md#path-item-object",
+      },
+    },
+    "discriminators": {
+      "description": "With schemas that can be, or contain, different shapes, discriminators help you assist your users in identifying and determining the kind of shape they can supply or receive.",
+      "locations": [],
+      "present": false,
+      "url": {
+        "3.0": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md#discriminator-object",
+        "3.1": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.1.md#discriminator-object",
+      },
+    },
+    "links": {
+      "description": "Links allow you to define at call-time relationships to other operations within your API.",
+      "locations": [],
+      "present": false,
+      "url": {
+        "3.0": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md#link-object",
+        "3.1": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.1.md#link-object",
+      },
+    },
+    "polymorphism": {
+      "description": "Polymorphism (allOf, oneOf, and anyOf) allow you to describe schemas that may contain either many different shapes, or a single shape containing multiple different schemas.",
+      "locations": [],
+      "present": false,
+      "url": {
+        "3.0": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md#schema-object",
+        "3.1": "https://json-schema.org/understanding-json-schema/reference/combining.html",
+      },
+    },
+    "refNames": {
+      "description": "Determines the presence of the \`x-readme-ref-name\` extension that ReadMe uses when dereferencing API definitions.",
+      "hidden": true,
+      "locations": [],
+      "present": false,
+    },
+    "serverVariables": {
+      "description": "Server variables allow to do user-supplied variable subsitituions within your API server URL.",
+      "locations": [],
+      "present": false,
+      "url": {
+        "3.0": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md#server-variable-object",
+        "3.1": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.1.md#server-variable-object",
+      },
+    },
+    "style": {
+      "description": "Parameter serialization (style) allows you to describe how the parameter should be sent to your API.",
+      "locations": [],
+      "present": false,
+      "url": {
+        "3.0": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md#parameter-style",
+        "3.1": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.1.md#parameter-style",
+      },
+    },
+    "webhooks": {
+      "description": "Webhooks allow you to describe out of band requests that may be initiated by your users.",
+      "locations": [],
+      "present": false,
+      "url": {
+        "3.1": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.1.md#user-content-oaswebhooks",
+      },
+    },
+    "xmlRequests": {
+      "description": "Any request body that accepts an XML payload.",
+      "locations": [],
+      "present": false,
+      "url": {
+        "3.0": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md#request-body-object",
+        "3.1": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.1.md#request-body-object",
+      },
+    },
+    "xmlResponses": {
+      "description": "Any response that returns an XML payload.",
+      "locations": [
+        "#/paths/~1pet~1findByStatus/get/responses/200/content/application~1xml",
+        "#/paths/~1pet~1findByTags/get/responses/200/content/application~1xml",
+        "#/paths/~1pet~1{petId}/get/responses/200/content/application~1xml",
+        "#/paths/~1store~1order/post/responses/200/content/application~1xml",
+        "#/paths/~1store~1order~1{orderId}/get/responses/200/content/application~1xml",
+        "#/paths/~1user~1login/get/responses/200/content/application~1xml",
+        "#/paths/~1user~1{username}/get/responses/200/content/application~1xml",
+      ],
+      "present": true,
+      "url": {
+        "3.0": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md#media-type-object",
+        "3.1": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.1.md#media-type-object",
+      },
+    },
+    "xmlSchemas": {
+      "description": "Any schema that utilizes the XML object for defining its shape in an XML payload.",
+      "locations": [
+        "#/components/schemas/Category",
+        "#/components/schemas/Order",
+        "#/components/schemas/Pet",
+        "#/components/schemas/Pet/properties/photoUrls",
+        "#/components/schemas/Pet/properties/tags",
+        "#/components/schemas/Tag",
+        "#/components/schemas/User",
+      ],
+      "present": true,
+      "url": {
+        "3.0": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.0.4.md#xml-object",
+        "3.1": "https://github.com/OAI/OpenAPI-Specification/blob/main/versions/3.1.1.md#xml-object",
+      },
+    },
+  },
+}
+`;
