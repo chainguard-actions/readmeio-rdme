@@ -1,0 +1,194 @@
+{
+  "name": "rdme",
+  "version": "10.9.1",
+  "description": "ReadMe's official CLI and GitHub Action.",
+  "keywords": [
+    "api",
+    "apidoc",
+    "apis",
+    "documentation",
+    "microservice",
+    "oai",
+    "oas",
+    "openapi",
+    "openapi document",
+    "openapi initiative",
+    "openapi spec",
+    "openapi specification",
+    "postman",
+    "readme",
+    "swagger"
+  ],
+  "bugs": {
+    "url": "https://github.com/readmeio/rdme/issues"
+  },
+  "license": "MIT",
+  "author": "ReadMe <support@readme.io> (https://readme.com)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/readmeio/rdme.git"
+  },
+  "bin": {
+    "rdme": "bin/run.js"
+  },
+  "files": [
+    "/bin/run*",
+    "/dist",
+    "/documentation",
+    "/oclif.manifest.json"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./types": "./dist/types.js",
+    "./utils": "./dist/utils.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:docs": "oclif readme --multi --output-dir documentation/commands --no-aliases",
+    "build:gha": "npm run build && rollup --config",
+    "format": "npx oxlint --fix && npx oxfmt --write",
+    "lint": "knip && npm run lint:ts && npx oxfmt --check && npm run schemas:check",
+    "lint:ts": "npx oxlint",
+    "lint:ts:write": "npx oxlint --fix",
+    "prebuild": "rm -rf dist/",
+    "prepack": "npm run build",
+    "prepare": "husky",
+    "pretest": "npm run build",
+    "schemas:check": "./bin/json-schema-store.js",
+    "schemas:write": "./bin/json-schema-store.js --update && npx oxfmt --write test/helpers/github-workflow-schema.json",
+    "test": "vitest run --coverage",
+    "version": "npm run build:gha && oclif manifest && npm run build:docs"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.1",
+    "@oclif/core": "^4.11.4",
+    "@oclif/plugin-autocomplete": "^3.2.50",
+    "@oclif/plugin-help": "^6.2.50",
+    "@oclif/plugin-plugins": "^5.4.72",
+    "@oclif/plugin-warn-if-update-available": "^3.1.65",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "chalk": "^5.3.0",
+    "ci-info": "^4.4.0",
+    "configstore": "^7.0.0",
+    "debug": "^4.3.3",
+    "gray-matter": "^4.0.1",
+    "ignore": "^7.0.0",
+    "js-yaml": "^4.2.0",
+    "json-schema-to-ts": "^3.1.1",
+    "mime-types": "^3.0.1",
+    "oas": "^34.0.2",
+    "oas-normalize": "^16.0.5",
+    "ora": "^9.4.0",
+    "prompts": "^2.4.2",
+    "remove-undefined-objects": "^9.0.0",
+    "semver": "^7.8.2",
+    "simple-git": "^3.36.0",
+    "slugify": "^1.6.9",
+    "string-argv": "^0.3.2",
+    "table": "^6.8.1",
+    "tmp-promise": "^3.0.3",
+    "toposort": "^2.0.2",
+    "undici": "^6.25.0",
+    "unzipper": "^0.12.3"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
+    "@oclif/test": "^4.1.18",
+    "@readme/better-ajv-errors": "^2.3.2",
+    "@readme/oas-examples": "^8.2.1",
+    "@readme/oxlint-config": "^1.5.0",
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "@rollup/plugin-json": "^6.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-replace": "^6.0.1",
+    "@types/debug": "^4.1.13",
+    "@types/js-yaml": "^4.0.5",
+    "@types/mime-types": "^3.0.0",
+    "@types/prompts": "^2.4.2",
+    "@types/semver": "^7.3.12",
+    "@types/toposort": "^2.0.7",
+    "@types/unzipper": "^0.10.11",
+    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/expect": "^4.1.8",
+    "husky": "^9.0.10",
+    "knip": "^6.16.0",
+    "nock": "^14.0.15",
+    "oclif": "^4.23.10",
+    "openapi-types": "^12.1.3",
+    "oxfmt": "^0.53.0",
+    "oxlint": "^1.68.0",
+    "rollup": "^4.61.1",
+    "rollup-plugin-esbuild": "^6.2.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ],
+    "rules": {
+      "body-max-line-length": [
+        0,
+        "always",
+        "Infinity"
+      ],
+      "footer-max-line-length": [
+        0,
+        "always",
+        "Infinity"
+      ],
+      "scope-case": [
+        2,
+        "never",
+        "upper-case"
+      ]
+    }
+  },
+  "oclif": {
+    "bin": "rdme",
+    "commands": {
+      "identifier": "COMMANDS",
+      "strategy": "explicit",
+      "target": "./dist/index.js"
+    },
+    "dirname": "rdme",
+    "helpClass": "./dist/lib/help",
+    "hooks": {
+      "createGHA": {
+        "identifier": "createGHA",
+        "target": "./dist/index.js"
+      },
+      "prerun": {
+        "identifier": "prerun",
+        "target": "./dist/index.js"
+      }
+    },
+    "pluginPrefix": "rdme-plugin",
+    "plugins": [
+      "@oclif/plugin-autocomplete",
+      "@oclif/plugin-help",
+      "@oclif/plugin-plugins",
+      "@oclif/plugin-warn-if-update-available"
+    ],
+    "scope": "readme",
+    "topicSeparator": " ",
+    "topics": {
+      "docs": {
+        "description": "Upload or export Guides in your ReadMe project."
+      },
+      "openapi": {
+        "description": "Manage your API definition (e.g., syncing, validation, analysis, conversion, etc.). Supports OpenAPI, Swagger, and Postman collections, in either JSON or YAML formats."
+      },
+      "reference": {
+        "description": "Upload or export API Reference pages in your ReadMe project."
+      }
+    }
+  },
+  "engines": {
+    "node": ">=20.10.0"
+  }
+}

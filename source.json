@@ -1,6 +1,11 @@
 {
   "owner": "readmeio",
   "repo": "rdme",
-  "version": "",
-  "url": "https://github.com/readmeio/rdme"
+  "version": "v10.9.1",
+  "commit_sha": "7b543cfd89e3b8f7a99759b04f38df8887a38b7c",
+  "url": "https://github.com/readmeio/rdme",
+  "policy_sha": "ff50f15e4b79bfbf764dafdfd2579175a6ea9771",
+  "test_policy_sha": "843adf9e4b8f85d0c08b27b9d0b09dd094b54702",
+  "test_agent_version": "1",
+  "harden_agent_version": "1"
 }
