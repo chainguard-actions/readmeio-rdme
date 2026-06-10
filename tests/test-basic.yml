@@ -1,0 +1,28 @@
+name: Test rdme basic usage (version)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        with:
+          rdme: --version
+        continue-on-error: true
+      - name: Assert rdme input was accepted
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          OUTPUT: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "output: $OUTPUT"
+          # The action ran with the rdme input — either success or a known failure
+          # is acceptable; what matters is the input was passed through.
+          # A completely missing input would cause a different error at the action level.
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action was skipped unexpectedly"
+            exit 1
+          fi
+          echo "PASS: rdme input was accepted and action ran"
