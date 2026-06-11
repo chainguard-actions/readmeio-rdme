@@ -1,4 +1,4 @@
-name: Test rdme basic usage (version)
+name: Test rdme basic usage (version command)
 on:
   workflow_dispatch:
 jobs:
@@ -10,13 +10,13 @@ jobs:
         uses: .
         with:
           rdme: --version
-      - name: Assert output is non-empty
+      - name: Assert output is set
         env:
           ACTUAL: ${{ steps.action.outputs.rdme }}
         run: |
           echo "actual: $ACTUAL"
           if [ -z "$ACTUAL" ]; then
-            echo "FAIL: expected non-empty output from rdme --version"
+            echo "FAIL: expected rdme output to be non-empty"
             exit 1
           fi
           echo "PASS"
