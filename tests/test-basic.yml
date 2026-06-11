@@ -11,18 +11,17 @@ jobs:
         with:
           rdme: --version
         continue-on-error: true
-      - name: Assert rdme input was accepted
+      - name: Assert rdme output is present
         env:
           OUTCOME: ${{ steps.action.outcome }}
           OUTPUT: ${{ steps.action.outputs.rdme }}
         run: |
           echo "outcome: $OUTCOME"
           echo "output: $OUTPUT"
-          # The action ran with the rdme input — either success or a known failure
-          # is acceptable; what matters is the input was passed through.
-          # A completely missing input would cause a different error at the action level.
+          # The action ran (success or failure is acceptable for --version)
+          # but the step must have been reached (not skipped)
           if [ "$OUTCOME" = "skipped" ]; then
-            echo "FAIL: action was skipped unexpectedly"
+            echo "FAIL: action step was skipped unexpectedly"
             exit 1
           fi
-          echo "PASS: rdme input was accepted and action ran"
+          echo "PASS: action executed with rdme input"
