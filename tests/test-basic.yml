@@ -9,20 +9,17 @@ jobs:
       - id: action
         uses: .
         with:
-          rdme: --version
+          rdme: "--version"
         continue-on-error: true
       - name: Assert rdme input was accepted
         env:
           OUTCOME: ${{ steps.action.outcome }}
-          OUTPUT: ${{ steps.action.outputs.rdme }}
         run: |
           echo "outcome: $OUTCOME"
-          echo "output: $OUTPUT"
-          # The action ran with the rdme input provided; either success or
-          # a known failure (e.g. network/auth) is acceptable — what matters
-          # is that the input was passed through and the action executed.
-          if [ "$OUTCOME" = "skipped" ]; then
-            echo "FAIL: action was skipped unexpectedly"
+          # The action ran with the rdme input provided — success or known failure both indicate the input was processed
+          if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action executed with rdme input"
+          else
+            echo "FAIL: unexpected outcome: $OUTCOME"
             exit 1
           fi
-          echo "PASS: rdme input was accepted and action executed"
