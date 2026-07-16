@@ -1,0 +1,21 @@
+{
+  "status": "self_contained",
+  "entries": [
+    {
+      "path": "dist-gha/run.cjs",
+      "status": "self_contained",
+      "warnings": [
+        "ignored-dynamic-import: Importing \"source-map-support\" was allowed even though it could not be resolved because dynamic import failures appear to be handled here:",
+        "unsupported-dynamic-import: This \"import\" expression will not be bundled because the argument is not a string literal",
+        "unsupported-dynamic-import: This \"import\" expression will not be bundled because the argument is not a string literal",
+        "unsupported-dynamic-import: This \"import\" expression will not be bundled because the argument is not a string literal",
+        "unsupported-dynamic-import: This \"import\" expression will not be bundled because the argument is not a string literal",
+        "unsupported-dynamic-import: This \"import\" expression will not be bundled because the argument is not a string literal"
+      ]
+    },
+    {
+      "path": "bin/write-gha-pjson.js",
+      "status": "self_contained"
+    }
+  ]
+}

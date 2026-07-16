@@ -1,0 +1,70 @@
+name: Release
+on:
+  push:
+    branches:
+      - main
+      - next
+      - v9
+
+permissions:
+  # See provenance docs: https://docs.npmjs.com/generating-provenance-statements#publishing-packages-with-provenance-via-github-actions
+  id-token: write
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_GH_TOKEN }}
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies and build TS
+        run: npm ci && npm run build
+
+      - name: Install semantic-release and friends
+        run: npm i --no-save semantic-release@24 @semantic-release/changelog@6 @semantic-release/exec@6 @semantic-release/git@10
+
+      - name: Run semantic-release workflow
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # See provenance docs: https://docs.npmjs.com/generating-provenance-statements#publishing-packages-with-provenance-via-github-actions
+          NPM_CONFIG_PROVENANCE: 'true'
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release
+
+      - name: Sync changes back to next
+        if: ${{ github.ref == 'refs/heads/main' }}
+        uses: ad-m/github-push-action@881a6320fdb16eb5318c5054f31c218aec2b324c # master
+        with:
+          github_token: ${{ secrets.RELEASE_GH_TOKEN }}
+          branch: next
+
+  # quick assertion to validate that rdme CLI can be installed and run on ubuntu
+  postrelease:
+    name: Post-release checks
+    needs: release
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/next' }}
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: lts/*
+      - name: Install `rdme` from npm
+        run: npm install -g rdme@next
+      - name: Print rdme CLI version
+        run: rdme --version
+        timeout-minutes: 1
