@@ -8,6 +8,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
+| v10 | [`v10`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10) | [`460da9b`](https://github.com/readmeio/rdme/commit/460da9b8aa6b7bbd6bf774fb2d66b3f0b9030b12) |
 | v10.8.0 | [`v10.8.0`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.8.0) | [`e29567f`](https://github.com/readmeio/rdme/commit/e29567f6c0b211ee8b6110c2cbe12bec53ca378f) |
 | v10.9.0 | [`v10.9.0`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.9.0) | [`ec5cd68`](https://github.com/readmeio/rdme/commit/ec5cd68823bff400ae286b6698c29f81e21f08d6) |
 | v10.9.1 | [`v10.9.1`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.9.1) | [`7b543cf`](https://github.com/readmeio/rdme/commit/7b543cfd89e3b8f7a99759b04f38df8887a38b7c) |
