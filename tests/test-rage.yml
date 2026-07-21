@@ -1,0 +1,66 @@
+name: Test rdme rage (debug info)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # GitHub Actions does not execute `pre` scripts for local actions.
+      # We must manually run the pre step (bin/write-gha-pjson.js) so that
+      # dist-gha/package.json is written before the main action runs.
+      - name: Run pre step (write-gha-pjson)
+        run: node bin/write-gha-pjson.js
+
+      - id: action
+        uses: .
+        with:
+          rdme: rage
+
+      - name: Assert output is non-empty
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected non-empty output from rage"
+            exit 1
+          fi
+          echo "PASS: rage produced output"
+
+      - name: Assert output contains CLI section
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          if echo "$ACTUAL" | grep -qi "CLI"; then
+            echo "PASS: output contains 'CLI'"
+          else
+            echo "FAIL: expected output to contain 'CLI' section but got: $ACTUAL"
+            exit 1
+          fi
+
+      - name: Assert output contains Platform section
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          if echo "$ACTUAL" | grep -qi "Platform"; then
+            echo "PASS: output contains 'Platform'"
+          else
+            echo "FAIL: expected output to contain 'Platform' section but got: $ACTUAL"
+            exit 1
+          fi
+
+      - name: Assert output contains Environment section
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          if echo "$ACTUAL" | grep -qi "Environment"; then
+            echo "PASS: output contains 'Environment'"
+          else
+            echo "FAIL: expected output to contain 'Environment' section but got: $ACTUAL"
+            exit 1
+          fi

@@ -1,0 +1,42 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "version": "1.0.0",
+    "title": "Petstore",
+    "description": "A simple petstore API definition for testing rdme validate."
+  },
+  "servers": [
+    {
+      "url": "https://petstore.example.com"
+    }
+  ],
+  "paths": {
+    "/pets": {
+      "get": {
+        "summary": "List all pets",
+        "operationId": "listPets",
+        "tags": ["pets"],
+        "responses": {
+          "200": {
+            "description": "A list of pets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "integer" },
+                      "name": { "type": "string" }
+                    },
+                    "required": ["id", "name"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

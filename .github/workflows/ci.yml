@@ -8,13 +8,12 @@ on:
       - v9
   pull_request:
 
-permissions:
-  contents: read
-
 jobs:
   build:
     name: Test Suite
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -27,7 +26,7 @@ jobs:
           - latest
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -40,9 +39,11 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: lts/*
@@ -60,14 +61,16 @@ jobs:
   action:
     name: GitHub Action Dry Run
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout GitHub Action
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: rdme-repo
 
       - name: Checkout external repo containing OpenAPI file
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: oas-examples-repo
           repository: readmeio/oas-examples
@@ -136,7 +139,7 @@ jobs:
       # this is a test to ensure that the rdme github action can run properly
       # the way that our users invoke it
       - name: E2E run of `openapi validate` on `next` branch
-        uses: readmeio/rdme@d91b0a32de5cc780c43564c66e70175e5d1a77dd # next
+        uses: readmeio/rdme@2ba919093bf3e008ce09a1d56c9b2a9982cbd7d9 # next
         if: ${{ github.ref == 'refs/heads/next'}}
         with:
           rdme: openapi validate oas-examples-repo/3.1/json/petstore.json

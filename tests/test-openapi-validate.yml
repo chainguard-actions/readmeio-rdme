@@ -1,4 +1,4 @@
-name: Test rdme openapi validate command
+name: Test rdme openapi validate (valid spec)
 on:
   workflow_dispatch:
 jobs:
@@ -6,53 +6,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Ensure dist-gha/package.json exists (pre step workaround for act)
-        run: |
-          SCRIPT=$(find "$GITHUB_WORKSPACE" -name "write-gha-pjson.js" -type f 2>/dev/null | head -1)
-          if [ -n "$SCRIPT" ]; then
-            DIST_GHA="$(dirname "$SCRIPT")/../dist-gha"
-            if [ ! -f "$DIST_GHA/package.json" ]; then
-              echo "Running pre step manually: $SCRIPT"
-              node "$SCRIPT"
-            else
-              echo "dist-gha/package.json already exists, skipping pre step"
-            fi
-          else
-            echo "Could not find write-gha-pjson.js, skipping"
-          fi
-      - name: Create test OpenAPI fixture
-        run: |
-          mkdir -p /tmp/rdme-test
-          printf '%s\n' \
-            'openapi: "3.0.3"' \
-            'info:' \
-            '  title: Test API' \
-            '  version: "1.0.0"' \
-            'paths:' \
-            '  /hello:' \
-            '    get:' \
-            '      summary: Say hello' \
-            '      responses:' \
-            '        "200":' \
-            '          description: A greeting' \
-            > /tmp/rdme-test/openapi.yaml
+
+      # GitHub Actions does not execute `pre` scripts for local actions.
+      # We must manually run the pre step (bin/write-gha-pjson.js) so that
+      # dist-gha/package.json is written before the main action runs.
+      - name: Run pre step (write-gha-pjson)
+        run: node bin/write-gha-pjson.js
+
       - id: action
         uses: .
         with:
-          rdme: "openapi:validate /tmp/rdme-test/openapi.yaml"
-      - name: Assert validation succeeded
+          rdme: openapi:validate test/__fixtures__/petstore-simple-weird-version.json
+
+      - name: Assert output contains valid message
         env:
           ACTUAL: ${{ steps.action.outputs.rdme }}
         run: |
           echo "actual: $ACTUAL"
-          # The action step itself would have failed (exit 1) if validation failed,
-          # so reaching here means validation succeeded.
-          if [ -n "$ACTUAL" ]; then
-            if echo "$ACTUAL" | grep -qi "error\|invalid\|fail"; then
-              echo "FAIL: validation reported errors: $ACTUAL"
-              exit 1
-            fi
-            echo "PASS: openapi validate completed with output: $ACTUAL"
+          if echo "$ACTUAL" | grep -qi "valid"; then
+            echo "PASS: output contains 'valid'"
           else
-            echo "PASS: openapi validate completed successfully (no output captured)"
+            echo "FAIL: expected output to contain 'valid' but got: $ACTUAL"
+            exit 1
           fi

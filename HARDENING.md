@@ -8,7 +8,7 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
 Action **readmeio--rdme/v10** was hardened automatically. 2 finding(s) were identified and resolved across 1 iteration(s).
 
@@ -16,45 +16,45 @@ Action **readmeio--rdme/v10** was hardened automatically. 2 finding(s) were iden
 
 ### unpinned-uses (severity: high)
 
-Multiple workflow files reference external GitHub Actions using mutable tags or branch names instead of immutable 40-character commit SHAs. This exposes the workflow to supply-chain attacks if the referenced tag or branch is moved to a malicious commit.
+Multiple workflow files reference GitHub Actions using mutable tags or branch names instead of pinned 40-character commit SHAs, making them vulnerable to supply-chain attacks if the referenced action is compromised or its tag is moved.
 
-ci.yml: actions/checkout@v7 (lines 27, 39, 55, 59), actions/setup-node@v6 (lines 30, 40), readmeio/rdme@next (line 118)
-codeql-analysis.yml: actions/checkout@v7 (line 21), github/codeql-action/init@v4 (line 24), github/codeql-action/analyze@v4 (line 30)
-docs.yml: actions/checkout@v7 (line 19), jacobtomlinson/gha-find-replace@v3 (lines 44, 51), readmeio/rdme@main (line 73)
-lint-pr-title.yml: amannn/action-semantic-pull-request@v6 (line 17)
-release.yml: actions/checkout@v7 (line 22), actions/setup-node@v6 (lines 26, 57), ad-m/github-push-action@master (line 44)
-simple.yml: actions/checkout@v7 (line 13)
+.github/workflows/ci.yml: actions/checkout@v7 (lines 27, 40, 55, 60), actions/setup-node@v6 (lines 30, 41), readmeio/rdme@next (line 119)
+.github/workflows/codeql-analysis.yml: actions/checkout@v7 (line 17), github/codeql-action/init@v4 (line 20), github/codeql-action/analyze@v4 (line 24)
+.github/workflows/docs.yml: actions/checkout@v7 (line 19), jacobtomlinson/gha-find-replace@v3 (lines 43, 49), readmeio/rdme@main (line 72)
+.github/workflows/lint-pr-title.yml: amannn/action-semantic-pull-request@v6 (line 14)
+.github/workflows/release.yml: actions/checkout@v7 (line 23), actions/setup-node@v6 (lines 27, 55), ad-m/github-push-action@master (line 44)
+.github/workflows/simple.yml: actions/checkout@v7 (line 12)
 
 Locations:
 
 - `.github/workflows/ci.yml:27`
 - `.github/workflows/ci.yml:30`
-- `.github/workflows/ci.yml:39`
 - `.github/workflows/ci.yml:40`
+- `.github/workflows/ci.yml:41`
 - `.github/workflows/ci.yml:55`
-- `.github/workflows/ci.yml:59`
-- `.github/workflows/ci.yml:118`
-- `.github/workflows/codeql-analysis.yml:21`
+- `.github/workflows/ci.yml:60`
+- `.github/workflows/ci.yml:119`
+- `.github/workflows/codeql-analysis.yml:17`
+- `.github/workflows/codeql-analysis.yml:20`
 - `.github/workflows/codeql-analysis.yml:24`
-- `.github/workflows/codeql-analysis.yml:30`
 - `.github/workflows/docs.yml:19`
-- `.github/workflows/docs.yml:44`
-- `.github/workflows/docs.yml:51`
-- `.github/workflows/docs.yml:73`
-- `.github/workflows/lint-pr-title.yml:17`
-- `.github/workflows/release.yml:22`
-- `.github/workflows/release.yml:26`
+- `.github/workflows/docs.yml:43`
+- `.github/workflows/docs.yml:49`
+- `.github/workflows/docs.yml:72`
+- `.github/workflows/lint-pr-title.yml:14`
+- `.github/workflows/release.yml:23`
+- `.github/workflows/release.yml:27`
 - `.github/workflows/release.yml:44`
-- `.github/workflows/release.yml:57`
-- `.github/workflows/simple.yml:13`
+- `.github/workflows/release.yml:55`
+- `.github/workflows/simple.yml:12`
 
 ### missing-permissions (severity: medium)
 
-Three workflow files have no top-level 'permissions:' block and no job-level 'permissions:' blocks on any of their jobs. Without explicit permissions, GitHub Actions defaults to the repository's default token permissions, which may be overly broad (write access to contents by default on many repositories). Each workflow should declare minimal required permissions.
+Three workflow files have no top-level `permissions:` key and no job-level `permissions:` key on any of their jobs. Without explicit permissions, GitHub Actions defaults to the repository's default token permissions (which may be broad), violating the principle of least privilege.
 
-- ci.yml: three jobs (build, lint, action) with no permissions declared
-- docs.yml: one job (sync) with no permissions declared
-- simple.yml: one job (simple) with no permissions declared
+- .github/workflows/ci.yml: no permissions defined for jobs: build, lint, action
+- .github/workflows/docs.yml: no permissions defined for job: sync
+- .github/workflows/simple.yml: no permissions defined for job: simple
 
 Locations:
 
@@ -70,5 +70,5 @@ Locations:
 
 **Notes:**
 
-Fixed all 20 unpinned action references across 6 workflow files by replacing mutable tags/branches with full 40-character commit SHAs (preserving original tag as comment). Added top-level 'permissions: contents: read' blocks to ci.yml, docs.yml, and simple.yml which lacked any permissions declarations. The other three workflow files (codeql-analysis.yml, lint-pr-title.yml, release.yml) already had appropriate permissions blocks and only needed action pinning fixes.
+Fixed all unpinned action references across 6 workflow files by pinning to full 40-character commit SHAs with original tags preserved as comments. Added permissions blocks (contents: read) to the 3 workflow files that were missing them (ci.yml - per job, docs.yml - per job, simple.yml - per job). Specific pins applied: actions/checkout@v7 → 3d3c42e5aac5ba805825da76410c181273ba90b1, actions/setup-node@v6 → 249970729cb0ef3589644e2896645e5dc5ba9c38, readmeio/rdme@next and @main → 2ba919093bf3e008ce09a1d56c9b2a9982cbd7d9, github/codeql-action/init@v4 and analyze@v4 → 7188fc363630916deb702c7fdcf4e481b751f97a, jacobtomlinson/gha-find-replace@v3 → 2ff30f644d2e0078fc028beb9193f5ff0dcad39e, amannn/action-semantic-pull-request@v6 → 48f256284bd46cdaab1048c3721360e808335d50, ad-m/github-push-action@master → 881a6320fdb16eb5318c5054f31c218aec2b324c.
 

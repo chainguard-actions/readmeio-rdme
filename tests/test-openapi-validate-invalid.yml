@@ -1,4 +1,4 @@
-name: Test rdme openapi inspect
+name: Test rdme openapi validate (invalid spec)
 on:
   workflow_dispatch:
 jobs:
@@ -15,16 +15,18 @@ jobs:
 
       - id: action
         uses: .
+        continue-on-error: true
         with:
-          rdme: openapi:inspect test/__fixtures__/petstore-simple-weird-version.json
+          rdme: openapi:validate test/__fixtures__/invalid-oas.json
 
-      - name: Assert output is non-empty
+      - name: Assert action failed for invalid spec
         env:
-          ACTUAL: ${{ steps.action.outputs.rdme }}
+          OUTCOME: ${{ steps.action.outcome }}
         run: |
-          echo "actual: $ACTUAL"
-          if [ -z "$ACTUAL" ]; then
-            echo "FAIL: expected non-empty output from openapi inspect"
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed for invalid OpenAPI spec"
+          else
+            echo "FAIL: expected action to fail for invalid spec but outcome was: $OUTCOME"
             exit 1
           fi
-          echo "PASS: openapi inspect produced output"
