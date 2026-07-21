@@ -12,11 +12,11 @@ on:
       - main
       - next
 
+permissions: {}
+
 jobs:
   sync:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout this repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

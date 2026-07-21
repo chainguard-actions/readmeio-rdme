@@ -1,4 +1,4 @@
-name: Test rdme version command
+name: Test rdme --version
 on:
   workflow_dispatch:
 jobs:
@@ -6,31 +6,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Ensure dist-gha/package.json exists (pre step workaround for act)
+      - name: Create dist-gha/package.json (equivalent to pre step write-gha-pjson.js)
         run: |
-          SCRIPT=$(find "$GITHUB_WORKSPACE" -name "write-gha-pjson.js" -type f 2>/dev/null | head -1)
-          if [ -n "$SCRIPT" ]; then
-            DIST_GHA="$(dirname "$SCRIPT")/../dist-gha"
-            if [ ! -f "$DIST_GHA/package.json" ]; then
-              echo "Running pre step manually: $SCRIPT"
-              node "$SCRIPT"
-            else
-              echo "dist-gha/package.json already exists, skipping pre step"
-            fi
-          else
-            echo "Could not find write-gha-pjson.js, skipping"
-          fi
+          # The action's pre step (bin/write-gha-pjson.js) creates dist-gha/package.json
+          # but pre steps don't run for local actions. We replicate it here using jq.
+          jq '
+            .private = true |
+            .oclif.commands.target = "./commands.js" |
+            .oclif.hooks |= with_entries(.value.target = "./commands.js") |
+            del(.oclif.helpClass) |
+            del(.oclif.plugins)
+          ' package.json > dist-gha/package.json
+          echo "Created dist-gha/package.json:"
+          cat dist-gha/package.json | head -20
       - id: action
         uses: .
+        continue-on-error: true
         with:
-          rdme: "--version"
-      - name: Assert version command ran successfully
+          rdme: --version
+      - name: Assert action succeeded
         env:
+          OUTCOME: ${{ steps.action.outcome }}
           ACTUAL: ${{ steps.action.outputs.rdme }}
         run: |
-          echo "actual: $ACTUAL"
-          # The --version flag is handled by oclif before _run is called,
-          # so it may not set the rdme output via core.setOutput.
-          # We just verify the step above completed with exit code 0
-          # (if it had failed, the workflow would have already stopped).
-          echo "PASS: rdme --version completed successfully"
+          echo "outcome: $OUTCOME"
+          echo "actual output: $ACTUAL"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected action to succeed for --version, but got outcome: $OUTCOME"
+            exit 1
+          fi
+          echo "PASS: action succeeded for --version"

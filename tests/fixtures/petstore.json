@@ -1,15 +1,10 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "version": "1.0.0",
     "title": "Petstore",
-    "description": "A simple petstore API definition for testing rdme validate."
+    "version": "1.0.0",
+    "description": "A sample API"
   },
-  "servers": [
-    {
-      "url": "https://petstore.example.com"
-    }
-  ],
   "paths": {
     "/pets": {
       "get": {
@@ -26,8 +21,12 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "id": { "type": "integer" },
-                      "name": { "type": "string" }
+                      "id": {
+                        "type": "integer"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
                     },
                     "required": ["id", "name"]
                   }
