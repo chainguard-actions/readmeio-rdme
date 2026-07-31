@@ -1,0 +1,31 @@
+name: Test rdme openapi inspect
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # GitHub Actions (and act) do not run `pre` scripts for local actions.
+      # We must manually invoke the pre-step script to write dist-gha/package.json.
+      - name: Prepare action (write dist-gha/package.json)
+        run: node bin/write-gha-pjson.js
+
+      - id: action
+        uses: .
+        with:
+          rdme: openapi inspect tests/fixtures/petstore.json
+
+      - name: Assert output contains inspection results
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          # rdme openapi inspect outputs a table of features found in the spec
+          if [ -n "$ACTUAL" ]; then
+            echo "PASS: output is non-empty (inspection ran)"
+          else
+            echo "FAIL: expected non-empty output from openapi inspect"
+            exit 1
+          fi

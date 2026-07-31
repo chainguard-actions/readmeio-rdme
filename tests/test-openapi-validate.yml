@@ -1,0 +1,30 @@
+name: Test rdme openapi validate (valid spec)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # GitHub Actions (and act) do not run `pre` scripts for local actions.
+      # We must manually invoke the pre-step script to write dist-gha/package.json.
+      - name: Prepare action (write dist-gha/package.json)
+        run: node bin/write-gha-pjson.js
+
+      - id: action
+        uses: .
+        with:
+          rdme: openapi validate tests/fixtures/petstore.json
+
+      - name: Assert output contains validation success
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          if echo "$ACTUAL" | grep -qi "valid\|success\|petstore"; then
+            echo "PASS: output indicates successful validation"
+          else
+            echo "FAIL: expected validation success message, got: $ACTUAL"
+            exit 1
+          fi

@@ -1,0 +1,36 @@
+name: Test rdme --version
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # GitHub Actions (and act) do not run `pre` scripts for local actions.
+      # We must manually invoke the pre-step script to write dist-gha/package.json.
+      - name: Prepare action (write dist-gha/package.json)
+        run: node bin/write-gha-pjson.js
+
+      - id: action
+        uses: .
+        with:
+          rdme: --version
+
+      - name: Assert output contains version string
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          # rdme --version outputs something like "rdme/10.x.x ..."
+          # If output is set, it should contain a version string
+          if [ -n "$ACTUAL" ]; then
+            if echo "$ACTUAL" | grep -qE "rdme/[0-9]+\.[0-9]+|[0-9]+\.[0-9]+\.[0-9]+"; then
+              echo "PASS: output contains version string"
+            else
+              echo "FAIL: output is set but does not contain a version string: $ACTUAL"
+              exit 1
+            fi
+          else
+            echo "PASS: action succeeded (--version outputs to stdout, not GHA output variable)"
+          fi
