@@ -1,0 +1,40 @@
+name: Test rdme version/help
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up dist-gha/package.json for action
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+          pkg.private = true;
+          pkg.oclif.commands.target = './commands.js';
+          Object.values(pkg.oclif.hooks).forEach(h => { h.target = './commands.js'; });
+          delete pkg.oclif.helpClass;
+          delete pkg.oclif.plugins;
+          fs.writeFileSync('dist-gha/package.json', JSON.stringify(pkg, null, 2));
+          console.log('Created dist-gha/package.json');
+          "
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          rdme: openapi validate --help
+
+      - name: Assert action ran successfully
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: rdme openapi validate --help completed successfully"
+          else
+            echo "FAIL: rdme openapi validate --help failed with outcome '$OUTCOME'"
+            exit 1
+          fi

@@ -1,0 +1,38 @@
+name: Test openapi validate (valid spec)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up dist-gha/package.json for action
+        run: |
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+          pkg.private = true;
+          pkg.oclif.commands.target = './commands.js';
+          Object.values(pkg.oclif.hooks).forEach(h => { h.target = './commands.js'; });
+          delete pkg.oclif.helpClass;
+          delete pkg.oclif.plugins;
+          fs.writeFileSync('dist-gha/package.json', JSON.stringify(pkg, null, 2));
+          console.log('Created dist-gha/package.json');
+          "
+
+      - id: action
+        uses: .
+        with:
+          rdme: openapi validate ${{ github.workspace }}/tests/fixtures/petstore.json
+
+      - name: Assert output contains validation success
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected non-empty output from rdme openapi validate"
+            exit 1
+          fi
+          echo "PASS: got output from rdme openapi validate"
