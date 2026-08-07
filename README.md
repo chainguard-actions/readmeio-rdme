@@ -16,6 +16,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | v10.9.2 | [`v10.9.2`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.9.2) | [`460da9b`](https://github.com/readmeio/rdme/commit/460da9b8aa6b7bbd6bf774fb2d66b3f0b9030b12) |
 | v10.9.4-next.1 | [`v10.9.4-next.1`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.9.4-next.1) | [`b79a369`](https://github.com/readmeio/rdme/commit/b79a3693b130ece310036835feb7eda3557f2c75) |
 | v10.9.5 | [`v10.9.5`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.9.5) | [`6c330ae`](https://github.com/readmeio/rdme/commit/6c330ae4130595720421809c4eaa37ba95d07f87) |
+| v10.9.6 | [`v10.9.6`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.9.6) | [`191a35d`](https://github.com/readmeio/rdme/commit/191a35d0bbea63de193d0efb357efbc5c977c6b3) |
 
 ## Privacy
 
