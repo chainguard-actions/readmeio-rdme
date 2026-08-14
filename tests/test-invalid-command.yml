@@ -1,0 +1,30 @@
+name: Test invalid rdme command handling
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          rdme: openapi validate /nonexistent/path/to/spec.yaml
+        continue-on-error: true
+
+      - name: Assert action failed gracefully for nonexistent file
+        if: always()
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully as expected (nonexistent file)"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "FAIL: action should have failed for nonexistent file"
+            exit 1
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

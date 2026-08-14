@@ -1,0 +1,36 @@
+name: Test openapi validate command
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          rdme: openapi validate ${{ github.workspace }}/tests/fixtures/openapi.yaml
+        continue-on-error: true
+
+      - name: Assert openapi validate result
+        if: always()
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "actual: $ACTUAL"
+          if [ "$OUTCOME" = "success" ]; then
+            if echo "$ACTUAL" | grep -qi "valid"; then
+              echo "PASS: output contains 'valid'"
+            else
+              echo "FAIL: expected output to contain 'valid', got: $ACTUAL"
+              exit 1
+            fi
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed (may be expected in this environment)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

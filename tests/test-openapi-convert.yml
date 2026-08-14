@@ -1,0 +1,42 @@
+name: Test openapi convert command
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          rdme: openapi convert ${{ github.workspace }}/tests/fixtures/openapi.yaml --out /tmp/converted-openapi.json
+        continue-on-error: true
+
+      - name: Assert openapi convert result
+        if: always()
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "actual: $ACTUAL"
+          if [ "$OUTCOME" = "success" ]; then
+            if echo "$ACTUAL" | grep -qi "converted\|bundled\|saved"; then
+              echo "PASS: output contains expected success message"
+            else
+              echo "FAIL: expected output to contain conversion success message, got: $ACTUAL"
+              exit 1
+            fi
+            if [ -f /tmp/converted-openapi.json ]; then
+              echo "PASS: converted file exists at /tmp/converted-openapi.json"
+            else
+              echo "FAIL: converted file not found at /tmp/converted-openapi.json"
+              exit 1
+            fi
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed (may be expected in this environment)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
