@@ -1,0 +1,71 @@
+name: Test openapi validate (invalid spec)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # The pre script (bin/write-gha-pjson.js) does not run for local actions.
+      # We copy the pre-built fixture to dist-gha/package.json so oclif can find its config.
+      # We try multiple methods to handle symlinks in the action directory.
+      - name: Prepare action (write dist-gha/package.json)
+        run: |
+          FIXTURE="$GITHUB_WORKSPACE/tests/fixtures/dist-gha-package.json"
+          echo "Fixture file: $FIXTURE"
+          ls -la "$FIXTURE"
+
+          # Method 1: Direct path (works if symlinks are followable inside the container)
+          if cp "$FIXTURE" "$GITHUB_WORKSPACE/action/dist-gha/package.json" 2>/dev/null; then
+            echo "Method 1 succeeded: wrote to action/dist-gha/package.json"
+            exit 0
+          fi
+          echo "Method 1 failed, trying method 2..."
+
+          # Method 2: Find the actual dist-gha directory by following symlinks
+          DIST_GHA=$(find -L "$GITHUB_WORKSPACE" -name "run.cjs" -path "*/dist-gha/*" 2>/dev/null | head -1 | xargs -I{} dirname {} 2>/dev/null)
+          if [ -n "$DIST_GHA" ]; then
+            echo "Found dist-gha at: $DIST_GHA"
+            if cp "$FIXTURE" "$DIST_GHA/package.json" 2>/dev/null; then
+              echo "Method 2 succeeded: wrote to $DIST_GHA/package.json"
+              exit 0
+            fi
+          fi
+          echo "Method 2 failed, trying method 3..."
+
+          # Method 3: Use realpath to resolve symlinks
+          DIST_GHA=$(realpath "$GITHUB_WORKSPACE/action/dist-gha" 2>/dev/null)
+          if [ -n "$DIST_GHA" ] && [ -d "$DIST_GHA" ]; then
+            echo "Resolved dist-gha to: $DIST_GHA"
+            if cp "$FIXTURE" "$DIST_GHA/package.json" 2>/dev/null; then
+              echo "Method 3 succeeded: wrote to $DIST_GHA/package.json"
+              exit 0
+            fi
+          fi
+
+          echo "ERROR: Could not write dist-gha/package.json"
+          exit 1
+
+      - id: action
+        uses: .
+        with:
+          rdme: openapi validate tests/fixtures/invalid-spec.json
+        continue-on-error: true
+
+      - name: Assert action fails on invalid spec
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "actual: $ACTUAL"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed on invalid spec"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "FAIL: action should have failed on invalid spec but succeeded"
+            exit 1
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - next
+      - v9
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          # see the following:
+          # https://github.com/actions/setup-node?tab=readme-ov-file#supported-version-syntax
+          # https://github.com/nvm-sh/nvm/issues/1998#issuecomment-594958684
+          - lts/-1
+          - lts/*
+          - latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Build and run tests
+        run: npm cit
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build dist
+        run: npm run build
+
+      - name: Run tests
+        run: npm run lint
+
+  action:
+    name: GitHub Action Dry Run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitHub Action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: rdme-repo
+
+      - name: Checkout external repo containing OpenAPI file
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: oas-examples-repo
+          repository: readmeio/oas-examples
+
+      # Since this workflow file is in the `rdme` repository itself,
+      # we need to test the GitHub Action using the current commit.
+      # This step builds the `rdme` action code so we can do that.
+      #
+      # This step is not required for syncing your docs to ReadMe!
+      - name: Rebuild GitHub Action for testing purposes
+        # We manually invoke `bin/write-gha-pjson.js` here because
+        # GitHub Actions does not support `pre` scripts for local actions.
+        run: npm ci && npm run build:gha && bin/write-gha-pjson.js
+        working-directory: rdme-repo
+
+      - name: Run root command
+        uses: ./rdme-repo/
+
+      - name: Run `openapi validate` command
+        uses: ./rdme-repo/
+        with:
+          rdme: openapi validate oas-examples-repo/3.1/json/petstore.json
+
+      # URL resolution uses `@apidevtools/json-schema-ref-parser`'s HTTP resolver, which
+      # dynamically imports `undici`. Regression guard for https://github.com/readmeio/rdme/issues/1513
+      - name: Run `openapi validate` command from a URL
+        uses: ./rdme-repo/
+        with:
+          rdme: openapi validate https://raw.githubusercontent.com/readmeio/oas-examples/main/3.1/json/petstore.json
+
+      - name: Run `openapi validate` command (legacy topic separator)
+        uses: ./rdme-repo/
+        with:
+          rdme: openapi:validate oas-examples-repo/3.1/json/petstore.json
+
+      - name: Run `openapi validate` with filename in quotes
+        uses: ./rdme-repo/
+        with:
+          rdme: openapi validate "oas-examples-repo/3.1/json/petstore.json"
+
+      - name: Run `openapi validate` on an invalid file
+        uses: ./rdme-repo/
+        id: openapi-validate-fail
+        continue-on-error: true
+        with:
+          rdme: openapi validate rdme-repo/test/__fixtures__/invalid-oas.json
+
+      - name: Assert that previous validation step failed
+        if: ${{ steps.openapi-validate-fail.outcome == 'failure' }}
+        run: echo "The previous step failed as expected."
+
+      - name: Throw error if previous validation step did not fail
+        if: ${{ steps.openapi-validate-fail.outcome == 'success' }}
+        run: echo "::error::Expected previous step to fail" && exit 1
+
+      # The `help` command is only available in the CLI.
+      # This step should fail because `help` does not exist in GitHub Actions
+      - name: Run `help`
+        uses: ./rdme-repo/
+        id: help-fail
+        continue-on-error: true
+        with:
+          rdme: help
+
+      - name: Assert that previous step failed
+        if: ${{ steps.help-fail.outcome == 'failure' }}
+        run: echo "The previous step failed as expected."
+
+      - name: Throw error if previous step did not fail
+        if: ${{ steps.help-fail.outcome == 'success' }}
+        run: echo "::error::Expected previous step to fail" && exit 1
+
+      # this is a test to ensure that the rdme github action can run properly
+      # the way that our users invoke it
+      - name: E2E run of `openapi validate` on `next` branch
+        uses: readmeio/rdme@750fc4ad47b4abe70d8ec5b594319a5d8dccf9da # next
+        if: ${{ github.ref == 'refs/heads/next'}}
+        with:
+          rdme: openapi validate oas-examples-repo/3.1/json/petstore.json
+
+      # Docs: https://rdme-refactored-test.readme.io
+      - name: Run `openapi upload` command
+        uses: ./rdme-repo/
+        with:
+          rdme: openapi upload oas-examples-repo/3.1/json/petstore.json --key=${{ secrets.RDME_REFACTORED_TEST_PROJECT_API_KEY }}
+      - name: Run `openapi upload` command with env var
+        uses: ./rdme-repo/
+        with:
+          rdme: openapi upload oas-examples-repo/3.1/json/petstore.json
+        env:
+          RDME_API_KEY: ${{ secrets.RDME_REFACTORED_TEST_PROJECT_API_KEY }}
+      - name: Run `openapi upload` command with other env var
+        uses: ./rdme-repo/
+        with:
+          rdme: openapi upload oas-examples-repo/3.1/json/petstore.json
+        env:
+          README_API_KEY: ${{ secrets.RDME_REFACTORED_TEST_PROJECT_API_KEY }}
+      - name: Run `openapi upload` command with weird arg syntax
+        uses: ./rdme-repo/
+        with:
+          rdme: openapi upload "oas-examples-repo/3.1/json/petstore.json" --key "${{ secrets.RDME_REFACTORED_TEST_PROJECT_API_KEY }}"
+      - name: Run `openapi upload` command with weird arg syntax and equal sign
+        uses: ./rdme-repo/
+        with:
+          rdme: openapi upload "oas-examples-repo/3.1/json/petstore.json" --key="${{ secrets.RDME_REFACTORED_TEST_PROJECT_API_KEY }}"
