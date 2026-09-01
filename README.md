@@ -11,6 +11,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | v10 | [`v10`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10) | [`2ba9190`](https://github.com/readmeio/rdme/commit/2ba919093bf3e008ce09a1d56c9b2a9982cbd7d9) |
 | v10.10.0-next.1 | [`v10.10.0-next.1`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.10.0-next.1) | [`7d4c97c`](https://github.com/readmeio/rdme/commit/7d4c97cec5bd208ae9b68b584524cc5086a9e17f) |
 | v10.10.0-next.3 | [`v10.10.0-next.3`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.10.0-next.3) | [`750fc4a`](https://github.com/readmeio/rdme/commit/750fc4ad47b4abe70d8ec5b594319a5d8dccf9da) |
+| v10.10.0-next.4 | [`v10.10.0-next.4`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.10.0-next.4) | [`399d2ff`](https://github.com/readmeio/rdme/commit/399d2fffb1e04514e9f8a3a94a9661f6d64d9971) |
 | v10.8.0 | [`v10.8.0`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.8.0) | [`e29567f`](https://github.com/readmeio/rdme/commit/e29567f6c0b211ee8b6110c2cbe12bec53ca378f) |
 | v10.9.0 | [`v10.9.0`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.9.0) | [`ec5cd68`](https://github.com/readmeio/rdme/commit/ec5cd68823bff400ae286b6698c29f81e21f08d6) |
 | v10.9.1 | [`v10.9.1`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.9.1) | [`7b543cf`](https://github.com/readmeio/rdme/commit/7b543cfd89e3b8f7a99759b04f38df8887a38b7c) |
