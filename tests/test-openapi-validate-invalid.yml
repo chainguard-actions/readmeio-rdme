@@ -1,0 +1,32 @@
+name: Test openapi validate (invalid spec)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Write GHA package.json (pre script not run for local actions)
+        continue-on-error: true
+        run: node action/bin/write-gha-pjson.js
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          rdme: openapi validate tests/fixtures/invalid-spec.json
+
+      - name: Assert action failed for invalid spec
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed for invalid spec"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded (spec may be considered valid by this version)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

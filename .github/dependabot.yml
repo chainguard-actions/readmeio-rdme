@@ -1,0 +1,41 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore(deps-gha)
+      prefix-development: chore(deps-gha-dev)
+
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    groups:
+      minor-development-deps:
+        dependency-type: 'development'
+        update-types:
+          - minor
+          - patch
+      minor-production-deps:
+        dependency-type: 'production'
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+    ignore:
+      # There are ProxyAgent discrepancies between undici@6 and
+      # the Node.js fetch implementation (which uses undici@5).
+      # Until we use undici itself for fetch calls, we should
+      # pin undici to the version used in Node.js core.
+      - dependency-name: undici
+        versions:
+          - '>= 6'
