@@ -1,0 +1,58 @@
+name: Test openapi validate with invalid spec
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pre-create dist-gha/package.json for act compatibility
+        run: |
+          # Find the action directory (handles both workspace-root-is-action-dir and workspace-root-is-repo-root)
+          if [ -f "package.json" ] && [ -d "dist-gha" ]; then
+            PKG_DIR="."
+          elif [ -f "action/package.json" ] && [ -d "action/dist-gha" ]; then
+            PKG_DIR="action"
+          else
+            echo "Cannot find action directory, skipping pre-create step"
+            exit 0
+          fi
+          chmod -R u+w "$PKG_DIR/dist-gha/" 2>/dev/null || true
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const pkgDir = process.argv[1];
+          const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf-8'));
+          pkg.private = true;
+          pkg.oclif.commands.target = './commands.js';
+          Object.values(pkg.oclif.hooks).forEach(h => { h.target = './commands.js'; });
+          delete pkg.oclif.helpClass;
+          delete pkg.oclif.plugins;
+          fs.writeFileSync(path.join(pkgDir, 'dist-gha/package.json'), JSON.stringify(pkg, null, 2));
+          console.log('Created dist-gha/package.json in', pkgDir);
+          " "$PKG_DIR"
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        env:
+          GITHUB_ACTIONS: "true"
+          CI: "true"
+        with:
+          rdme: openapi validate tests/fixtures/openapi/invalid.yaml
+
+      - name: Assert action failed for invalid spec
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action correctly failed for invalid OpenAPI spec"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "FAIL: expected action to fail for invalid spec but it succeeded"
+            exit 1
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
