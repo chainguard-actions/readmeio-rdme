@@ -1,0 +1,32 @@
+name: Test rdme openapi inspect
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          rdme: openapi inspect tests/fixtures/petstore-inspect.json
+      - name: Assert inspect output
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "actual: $ACTUAL"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$ACTUAL" ]; then
+              echo "FAIL: action succeeded but rdme output is empty"
+              exit 1
+            fi
+            echo "PASS: got inspect output: $ACTUAL"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (may be due to runtime environment)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

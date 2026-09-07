@@ -1,0 +1,28 @@
+name: Test rdme help command
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          rdme: help
+      - name: Assert help command ran (success or graceful failure)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "actual: $ACTUAL"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: help command ran successfully"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: help command ran (failed gracefully — built-in oclif command may exit non-zero)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

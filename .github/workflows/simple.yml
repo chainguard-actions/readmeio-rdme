@@ -1,0 +1,23 @@
+# This GitHub Action isn't actually used in our CI process,
+# it's just an example workflow that doesn't require any secure tokens
+# so we can run it in any environment (i.e. a local env using `act`)
+name: GitHub Action Simple Example
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  simple:
+    name: GitHub Action Auth-Less
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitHub Action
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      # This is a simple example that runs our `validate` command on a local file.
+      - name: Run `openapi:validate` command
+        uses: ./ # in actual production usage, this value should be 'readmeio/rdme@XX'
+        with:
+          rdme: openapi:validate test/__fixtures__/ref-oas/petstore.json
