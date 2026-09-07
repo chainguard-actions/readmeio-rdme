@@ -1,0 +1,51 @@
+name: Test rdme whoami when not logged in
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Prepare dist-gha/package.json
+        run: |
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const ws = process.env.GITHUB_WORKSPACE || process.cwd();
+          const candidates = [path.join(ws, 'action', 'package.json'), path.join(ws, 'package.json')];
+          let pkgPath;
+          for (const c of candidates) { if (fs.existsSync(c)) { pkgPath = c; break; } }
+          if (!pkgPath) { console.error('package.json not found'); process.exit(1); }
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+          pkg.private = true;
+          pkg.oclif.commands.target = './commands.js';
+          Object.values(pkg.oclif.hooks).forEach(h => { h.target = './commands.js'; });
+          delete pkg.oclif.helpClass;
+          delete pkg.oclif.plugins;
+          const outPath = path.join(path.dirname(pkgPath), 'dist-gha', 'package.json');
+          if (!fs.existsSync(outPath)) { fs.writeFileSync(outPath, JSON.stringify(pkg, null, 2)); console.log('Wrote ' + outPath); }
+          else { console.log('Already exists: ' + outPath); }
+          "
+
+      - id: action
+        name: Run rdme whoami (not logged in)
+        uses: .
+        with:
+          rdme: whoami
+        continue-on-error: true
+
+      - name: Assert action failed gracefully with login prompt
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed as expected when not logged in"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "FAIL: expected action to fail when not logged in"
+            exit 1
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
