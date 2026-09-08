@@ -1,0 +1,35 @@
+name: Test openapi inspect
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Prepare dist-gha/package.json
+        run: |
+          cat > /tmp/prepare-pkg.cjs << 'EOF'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+          pkg.private = true;
+          pkg.oclif.commands.target = './commands.js';
+          Object.values(pkg.oclif.hooks).forEach(hook => { hook.target = './commands.js'; });
+          delete pkg.oclif.helpClass;
+          delete pkg.oclif.plugins;
+          fs.writeFileSync('dist-gha/package.json', JSON.stringify(pkg, null, 2));
+          EOF
+          node /tmp/prepare-pkg.cjs
+      - id: action
+        uses: .
+        with:
+          rdme: openapi inspect tests/fixtures/petstore.json
+      - name: Assert output contains inspection results
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: expected non-empty output from rdme openapi inspect"
+            exit 1
+          fi
+          echo "PASS: got inspection output"
