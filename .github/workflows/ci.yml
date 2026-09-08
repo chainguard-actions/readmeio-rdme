@@ -8,12 +8,12 @@ on:
       - v9
   pull_request:
 
+permissions: {}
+
 jobs:
   build:
     name: Test Suite
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -39,8 +39,6 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -61,8 +59,6 @@ jobs:
   action:
     name: GitHub Action Dry Run
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout GitHub Action
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -146,7 +142,7 @@ jobs:
       # this is a test to ensure that the rdme github action can run properly
       # the way that our users invoke it
       - name: E2E run of `openapi validate` on `next` branch
-        uses: readmeio/rdme@7d4c97cec5bd208ae9b68b584524cc5086a9e17f # next
+        uses: readmeio/rdme@8c7d0c40f34e375bd7b0098a98a513530dfa113f # next
         if: ${{ github.ref == 'refs/heads/next'}}
         with:
           rdme: openapi validate oas-examples-repo/3.1/json/petstore.json
