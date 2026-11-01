@@ -1,0 +1,1239 @@
+import type { FullUploadResults } from '../../../src/lib/syncPagePath.js';
+import type { OclifOutput } from '../../helpers/oclif.js';
+
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+import nock from 'nock';
+import prompts from 'prompts';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import GuidesCommand from '../../../src/commands/docs/upload.js';
+import ReferenceCommand from '../../../src/commands/reference/upload.js';
+import { MAX_RETRIES } from '../../../src/lib/readmeAPIFetch.js';
+import { getAPIv1Mock, getAPIv2Mock, getAPIv2MockForGHA } from '../../helpers/get-api-mock.js';
+import { githubActionsEnv } from '../../helpers/git-mock.js';
+import { runCommand } from '../../helpers/oclif.js';
+
+const key = 'rdme_123';
+const authorization = `Bearer ${key}`;
+
+describe.each([
+  ['docs', GuidesCommand, 'guides'],
+  ['reference', ReferenceCommand, 'reference'],
+] as const)('rdme %s upload', (topic, Command, route) => {
+  let run: (args?: string[]) => OclifOutput;
+
+  beforeAll(() => {
+    run = runCommand(Command);
+  });
+
+  beforeEach(() => {
+    getAPIv1Mock().get('/api/v1/migration').basicAuth({ user: key }).reply(201, {
+      categories: {},
+      parentPages: {},
+    });
+    vi.spyOn(fs, 'writeFileSync').mockImplementation((file, data) => {
+      console.log(`=== BEGIN writeFileSync to file: ${file} ===`);
+      console.log(data);
+      console.log(`=== END writeFileSync to file: ${file} ===`);
+    });
+  });
+
+  afterEach(() => {
+    prompts.override({});
+    vi.restoreAllMocks();
+  });
+
+  describe('given that the file path is a single file', () => {
+    it('should create a page in ReadMe', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/stable/${route}/new-doc`)
+        .reply(404)
+        .post(`/branches/stable/${route}`, {
+          category: { uri: `/branches/stable/categories/${route}/category-slug` },
+          slug: 'new-doc',
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .reply(201, {});
+
+      const result = await run(['test/__fixtures__/docs/new-docs/new-doc.md', '--key', key]);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    it('should allow for user to specify branch via --branch flag', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/1.2.3/${route}/new-doc`)
+        .reply(404)
+        .post(`/branches/1.2.3/${route}`, {
+          category: { uri: `/branches/1.2.3/categories/${route}/category-slug` },
+          slug: 'new-doc',
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .reply(201, {});
+
+      const result = await run(['test/__fixtures__/docs/new-docs/new-doc.md', '--key', key, '--branch', '1.2.3']);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    it('should allow for user to specify branch via legacy --version flag', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/4.5.6/${route}/new-doc`)
+        .reply(404)
+        .post(`/branches/4.5.6/${route}`, {
+          category: { uri: `/branches/4.5.6/categories/${route}/category-slug` },
+          slug: 'new-doc',
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .reply(201, {});
+
+      const result = await run(['test/__fixtures__/docs/new-docs/new-doc.md', '--key', key, '--version', '4.5.6']);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    it('should gracefully handle errors that claim they are JSON but are not', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/stable/${route}/new-doc`)
+        .reply(404)
+        .post(`/branches/stable/${route}`, {
+          category: { uri: `/branches/stable/categories/${route}/category-slug` },
+          slug: 'new-doc',
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .reply(201, '<>yikes</>', { 'content-type': 'application/json' });
+
+      const result = await run(['test/__fixtures__/docs/new-docs/new-doc.md', '--key', key]);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    describe('given that the --dry-run flag is passed', () => {
+      it('should not create anything in ReadMe', async () => {
+        const mock = getAPIv2Mock({ authorization }).get(`/branches/stable/${route}/new-doc`).reply(404);
+
+        const result = await run(['test/__fixtures__/docs/new-docs/new-doc.md', '--key', key, '--dry-run']);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        mock.done();
+      });
+
+      it('should not update anything in ReadMe', async () => {
+        const mock = getAPIv2Mock({ authorization }).get(`/branches/stable/${route}/some-slug`).reply(200);
+
+        const result = await run(['test/__fixtures__/docs/slug-docs/new-doc-slug.md', '--key', key, '--dry-run']);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        mock.done();
+      });
+
+      it('should error out if a non-404 error is returned from the GET request', async () => {
+        const mock = getAPIv2Mock({ authorization })
+          .get(`/branches/stable/${route}/some-slug`)
+          .times(MAX_RETRIES + 1)
+          .reply(500);
+
+        const result = await run(['test/__fixtures__/docs/slug-docs/new-doc-slug.md', '--key', key, '--dry-run']);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        mock.done();
+      });
+
+      it('should error out if a non-404 error is returned from the GET request (with a json body)', async () => {
+        const mock = getAPIv2Mock({ authorization })
+          .get(`/branches/stable/${route}/some-slug`)
+          .times(MAX_RETRIES + 1)
+          .reply(500, {
+            title: 'bad request',
+            detail: 'something went so so wrong',
+            status: 500,
+          });
+
+        const result = await run(['test/__fixtures__/docs/slug-docs/new-doc-slug.md', '--key', key, '--dry-run']);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        mock.done();
+      });
+    });
+
+    describe('given that the slug is passed in the frontmatter', () => {
+      it('should use that slug to create a page in ReadMe', async () => {
+        const mock = getAPIv2Mock({ authorization })
+          .get(`/branches/stable/${route}/some-slug`)
+          .reply(404)
+          .post(`/branches/stable/${route}`, {
+            category: { uri: `/branches/stable/categories/${route}/some-category-uri` },
+            title: 'This is the document title',
+            content: { body: '\nBody\n' },
+            slug: 'some-slug',
+          })
+          .reply(201, {});
+
+        const result = await run(['test/__fixtures__/docs/slug-docs/new-doc-slug.md', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        mock.done();
+      });
+
+      it('should use that slug update an existing page in ReadMe', async () => {
+        const mock = getAPIv2Mock({ authorization })
+          .get(`/branches/stable/${route}/some-slug`)
+          .reply(200)
+          .patch(`/branches/stable/${route}/some-slug`, {
+            category: { uri: `/branches/stable/categories/${route}/some-category-uri` },
+            title: 'This is the document title',
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {});
+
+        const result = await run(['test/__fixtures__/docs/slug-docs/new-doc-slug.md', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        mock.done();
+      });
+    });
+
+    describe('given that the file has frontmatter issues', () => {
+      it('should fix the frontmatter issues in the file', async () => {
+        prompts.inject([true]);
+
+        const result = await run(['test/__fixtures__/docs/mixed-docs/legacy-category.md', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          'test/__fixtures__/docs/mixed-docs/legacy-category.md',
+          expect.stringContaining('uri: uri-that-does-not-map-to-5ae122e10fdf4e39bb34db6f'),
+          { encoding: 'utf-8' },
+        );
+      });
+
+      it('should migrate legacy link frontmatter to content.link during dry run', async () => {
+        prompts.inject([true]);
+
+        const result = await run(['test/__fixtures__/docs/legacy-link.md', '--key', key, '--dry-run']);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          'test/__fixtures__/docs/legacy-link.md',
+          expect.stringContaining("url: 'https://example.com'"),
+          { encoding: 'utf-8' },
+        );
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          'test/__fixtures__/docs/legacy-link.md',
+          expect.stringContaining('content:'),
+          { encoding: 'utf-8' },
+        );
+      });
+
+      it('should fix the frontmatter issues in the file and insert the proper category mapping', async () => {
+        nock.cleanAll();
+        const mappingsMock = getAPIv1Mock()
+          .get('/api/v1/migration')
+          .basicAuth({ user: key })
+          .reply(201, {
+            categories: { '5ae122e10fdf4e39bb34db6f': 'mapped-uri' },
+          });
+
+        prompts.inject([true]);
+
+        const result = await run(['test/__fixtures__/docs/mixed-docs/legacy-category.md', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          'test/__fixtures__/docs/mixed-docs/legacy-category.md',
+          expect.stringContaining('uri: mapped-uri'),
+          { encoding: 'utf-8' },
+        );
+
+        mappingsMock.done();
+      });
+
+      it('should exit if the user declines to fix the issues', async () => {
+        prompts.inject([false]);
+
+        const result = await run(['test/__fixtures__/docs/mixed-docs/legacy-category.md', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+      });
+
+      it('should record a failed page when skip-validation leaves a non-string category URI', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdme-upload-bad-category-'));
+        try {
+          await fs.promises.writeFile(
+            path.join(tmpDir, 'bad-category.md'),
+            `---
+title: Bad category
+category:
+  uri: 123
+---
+
+Body
+`,
+          );
+
+          const result = await run([tmpDir, '--key', key, '--skip-validation']);
+
+          expect(result.error).toBeInstanceOf(TypeError);
+          expect(result.stderr).toContain('file(s) failed');
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      });
+
+      it('should skip client-side validation if the --skip-validation flag is passed', async () => {
+        const mock = getAPIv2Mock({ authorization })
+          .get(`/branches/stable/${route}/legacy-category`)
+          .reply(404)
+          .post(`/branches/stable/${route}`, {
+            category: '5ae122e10fdf4e39bb34db6f',
+            slug: 'legacy-category',
+            title: 'This is the document title',
+            content: { body: '\nBody\n' },
+          })
+          .reply(400, { title: 'bad request', detail: 'your category is whack' });
+
+        const result = await run([
+          'test/__fixtures__/docs/mixed-docs/legacy-category.md',
+          '--key',
+          key,
+          '--skip-validation',
+        ]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        mock.done();
+      });
+
+      it('should warn user if the file has no autofixable issues', async () => {
+        const mock = getAPIv2Mock({ authorization })
+          .get(`/branches/stable/${route}/invalid-attributes`)
+          .reply(404)
+          .post(`/branches/stable/${route}`, {
+            category: {
+              uri: `/branches/stable/categories/${route}/some-category-uri`,
+              'is-this-a-valid-property': 'nope',
+            },
+            slug: 'invalid-attributes',
+            title: 'This is the document title',
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {});
+
+        const result = await run(['test/__fixtures__/docs/mixed-docs/invalid-attributes.md', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        mock.done();
+      });
+    });
+
+    describe('and the command is being run in a CI environment', () => {
+      beforeEach(githubActionsEnv.before);
+
+      afterEach(githubActionsEnv.after);
+
+      it('should create a page in ReadMe and include `x-readme-source-url` source header', async () => {
+        const getMock = getAPIv2MockForGHA({ authorization }).get(`/branches/stable/${route}/new-doc`).reply(404);
+
+        const postMock = getAPIv2MockForGHA({
+          authorization,
+          'x-readme-source-url':
+            'https://github.com/octocat/Hello-World/blob/ffac537e6cbbf934b08745a378932722df287a53/test/__fixtures__/docs/new-docs/new-doc.md',
+        })
+          .post(`/branches/stable/${route}`, {
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            slug: 'new-doc',
+            title: 'This is the document title',
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {});
+
+        const result = await run(['test/__fixtures__/docs/new-docs/new-doc.md', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        getMock.done();
+        postMock.done();
+      });
+
+      it('should error out if the file has validation errors', async () => {
+        const result = await run(['test/__fixtures__/docs/mixed-docs/legacy-category.md', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+      });
+
+      it('should bypass prompt if `--confirm-autofixes` flag is passed', async () => {
+        const result = await run([
+          'test/__fixtures__/docs/mixed-docs/legacy-category.md',
+          '--key',
+          key,
+          '--confirm-autofixes',
+        ]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          'test/__fixtures__/docs/mixed-docs/legacy-category.md',
+          expect.stringContaining('uri: uri-that-does-not-map-to-5ae122e10fdf4e39bb34db6f'),
+          { encoding: 'utf-8' },
+        );
+      });
+    });
+
+    it('should error out if a non-404 error is returned from the GET request', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/stable/${route}/new-doc`)
+        .times(MAX_RETRIES + 1)
+        .reply(500);
+
+      const result = await run(['test/__fixtures__/docs/new-docs/new-doc.md', '--key', key]);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    it('should error out if a non-404 error is returned from the GET request (with a json body)', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/stable/${route}/new-doc`)
+        .times(MAX_RETRIES + 1)
+        .reply(500, {
+          title: 'bad request',
+          detail: 'something went so so wrong',
+          status: 500,
+        });
+
+      const result = await run(['test/__fixtures__/docs/new-docs/new-doc.md', '--key', key]);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    it('should not throw an error if `max-errors` flag is set to -1', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/stable/${route}/new-doc`)
+        .times(MAX_RETRIES + 1)
+        .reply(500, {
+          title: 'bad request',
+          detail: 'something went so so wrong',
+          status: 500,
+        });
+
+      const result = await run(['test/__fixtures__/docs/new-docs/new-doc.md', '--key', key, '--max-errors', '-1']);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    it('should error out if the file does not exist', async () => {
+      const result = await run(['non-existent-file', '--key', key]);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+    });
+
+    it('should error out if the file has an invalid file extension', async () => {
+      const result = await run(['package.json', '--key', key]);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('given that the file path is a directory', () => {
+    it('should create a page in ReadMe for each file in the directory and its subdirectories', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/stable/${route}/simple-doc`)
+        .reply(404)
+        .post(`/branches/stable/${route}`, {
+          slug: 'simple-doc',
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .reply(201, {})
+        .get(`/branches/stable/${route}/another-doc`)
+        .reply(404)
+        .post(`/branches/stable/${route}`, {
+          slug: 'another-doc',
+          title: 'This is another document title',
+          content: { body: '\nAnother body\n' },
+          category: { uri: `/branches/stable/categories/${route}/category-slug` },
+        })
+        .reply(201, {});
+
+      const result = await run([`test/__fixtures__/${topic}/existing-docs`, '--key', key]);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    it('should update existing pages in ReadMe for each file in the directory and its subdirectories', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/stable/${route}/simple-doc`)
+        .reply(200)
+        .patch(`/branches/stable/${route}/simple-doc`, {
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .reply(201, {})
+        .get(`/branches/stable/${route}/another-doc`)
+        .reply(200)
+        .patch(`/branches/stable/${route}/another-doc`, {
+          title: 'This is another document title',
+          category: { uri: `/branches/stable/categories/${route}/category-slug` },
+          content: { body: '\nAnother body\n' },
+        })
+        .reply(201, {});
+
+      const result = await run([`test/__fixtures__/${topic}/existing-docs`, '--key', key]);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    it('should handle complex frontmatter', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/stable/${route}/basic`)
+        .reply(200)
+        .patch(`/branches/stable/${route}/basic`, {
+          title: 'This is the document title',
+          category: { uri: `/branches/stable/categories/${route}/category-slug` },
+          content: { body: 'frontmatter body', excerpt: 'frontmatter excerpt' },
+          type: 'basic',
+        })
+        .reply(201, {})
+        .get(`/branches/stable/${route}/link`)
+        .reply(200)
+        .patch(`/branches/stable/${route}/link`, {
+          title: 'This is the document title',
+          category: { uri: `/branches/stable/categories/${route}/category-slug` },
+          content: {
+            body: '\nBody\n',
+            excerpt: 'frontmatter excerpt',
+            link: { url: 'https://example.com', new_tab: true },
+          },
+          type: 'link',
+        })
+        .reply(201, {});
+
+      const result = await run(['test/__fixtures__/docs/complex-frontmatter', '--key', key]);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    describe('given that the directory contains parent/child docs', () => {
+      it('should upload parents before children', async () => {
+        const mock = getAPIv2Mock({ authorization })
+          .get(`/branches/stable/${route}/child`)
+          .reply(404)
+          .post(`/branches/stable/${route}`, {
+            slug: 'child',
+            title: 'Child',
+            parent: { uri: `/branches/stable/${route}/parent` },
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .get(`/branches/stable/${route}/friend`)
+          .reply(404)
+          .post(`/branches/stable/${route}`, {
+            slug: 'friend',
+            title: 'Friend',
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .get(`/branches/stable/${route}/parent`)
+          .reply(404)
+          .post(`/branches/stable/${route}`, {
+            slug: 'parent',
+            title: 'Parent',
+            parent: { uri: `/branches/stable/${route}/grandparent` },
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .get(`/branches/stable/${route}/grandparent`)
+          .reply(404)
+          .post(`/branches/stable/${route}`, {
+            slug: 'grandparent',
+            title: 'Grandparent',
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {});
+
+        const result = await run(['test/__fixtures__/docs/multiple-docs', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        mock.done();
+      });
+
+      it('should upload a parent before its child when parent.uri is a full address', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdme-parent-uri-'));
+        // `writeFileSync` is mocked in this suite; use the promise API to persist fixtures.
+        const parentUri = `/branches/stable/${route}/zz-group`;
+        const middleUri = `/branches/stable/${route}/mm-middle`;
+        await fs.promises.writeFile(
+          path.join(tmpDir, 'aa-page.md'),
+          `---
+title: AA page
+parent:
+  uri: ${middleUri}
+---
+
+Body
+`,
+        );
+        await fs.promises.writeFile(
+          path.join(tmpDir, 'mm-middle.md'),
+          `---
+title: MM middle
+parent:
+  uri: ${parentUri}
+---
+
+Body
+`,
+        );
+        await fs.promises.writeFile(
+          path.join(tmpDir, 'zz-group.md'),
+          `---
+title: ZZ group
+---
+
+Body
+`,
+        );
+
+        try {
+          const mock = getAPIv2Mock({ authorization })
+            .get(`/branches/stable/${route}/zz-group`)
+            .reply(404)
+            .post(`/branches/stable/${route}`, {
+              slug: 'zz-group',
+              title: 'ZZ group',
+              content: { body: '\nBody\n' },
+            })
+            .reply(201, {})
+            .get(`/branches/stable/${route}/mm-middle`)
+            .reply(404)
+            .post(`/branches/stable/${route}`, {
+              slug: 'mm-middle',
+              title: 'MM middle',
+              parent: { uri: parentUri },
+              content: { body: '\nBody\n' },
+            })
+            .reply(201, {})
+            .get(`/branches/stable/${route}/aa-page`)
+            .reply(404)
+            .post(`/branches/stable/${route}`, {
+              slug: 'aa-page',
+              title: 'AA page',
+              parent: { uri: middleUri },
+              content: { body: '\nBody\n' },
+            })
+            .reply(201, {});
+
+          const result = await run([tmpDir, '--key', key]);
+
+          expect(result.error).toBeUndefined();
+          expect((result.result as unknown as FullUploadResults).created.map(page => page.slug)).toStrictEqual([
+            'zz-group',
+            'mm-middle',
+            'aa-page',
+          ]);
+
+          mock.done();
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      });
+
+      it('should error when full parent addresses form a cycle', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdme-parent-uri-cycle-'));
+        await fs.promises.writeFile(
+          path.join(tmpDir, 'page-a.md'),
+          `---
+title: Page A
+parent:
+  uri: /branches/stable/${route}/page-b
+---
+
+Body
+`,
+        );
+        await fs.promises.writeFile(
+          path.join(tmpDir, 'page-b.md'),
+          `---
+title: Page B
+parent:
+  uri: /branches/stable/${route}/page-a
+---
+
+Body
+`,
+        );
+
+        try {
+          const result = await run([tmpDir, '--key', key]);
+
+          expect(result.error).toBeInstanceOf(Error);
+          expect(result.error?.message).toBe('Cyclic dependency');
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      });
+
+      it('should keep uploading the rest of the batch when parent.uri is not a string', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdme-parent-uri-type-'));
+        // `writeFileSync` is mocked in this suite; use the promise API to persist fixtures.
+        await fs.promises.writeFile(
+          path.join(tmpDir, 'bad-page.md'),
+          `---
+title: Bad page
+parent:
+  uri: 123
+---
+
+Body
+`,
+        );
+        await fs.promises.writeFile(
+          path.join(tmpDir, 'good-page.md'),
+          `---
+title: Good page
+---
+
+Body
+`,
+        );
+
+        try {
+          const mock = getAPIv2Mock({ authorization })
+            .get(`/branches/stable/${route}/good-page`)
+            .reply(404)
+            .post(`/branches/stable/${route}`, {
+              slug: 'good-page',
+              title: 'Good page',
+              content: { body: '\nBody\n' },
+            })
+            .reply(201, {});
+
+          const result = await run([tmpDir, '--key', key, '--skip-validation', '--max-errors', '-1']);
+
+          expect(result.error).toBeUndefined();
+          const upload = result.result as unknown as FullUploadResults;
+          expect(upload.created.map(page => page.slug)).toStrictEqual(['good-page']);
+          expect(upload.failed.map(page => page.slug)).toStrictEqual(['bad-page']);
+          expect(upload.failed[0]?.error).toBeInstanceOf(TypeError);
+
+          mock.done();
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      });
+    });
+
+    describe('given that the directory has explicit frontmatter positions set', () => {
+      it('should upload root pages by ascending position (not filename order)', async () => {
+        const mock = getAPIv2Mock({ authorization })
+          .get(`/branches/stable/${route}/z-first`)
+          .reply(404)
+          .post(`/branches/stable/${route}`, {
+            slug: 'z-first',
+            title: 'Z file (position #1)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            position: 0,
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .get(`/branches/stable/${route}/a-second`)
+          .reply(404)
+          .post(`/branches/stable/${route}`, {
+            slug: 'a-second',
+            title: 'A file (position #2)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            position: 1,
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {});
+
+        const result = await run(['test/__fixtures__/docs/position-order-roots', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        expect((result.result as unknown as FullUploadResults).created.map(page => page.slug)).toStrictEqual([
+          'z-first',
+          'a-second',
+        ]);
+
+        mock.done();
+      });
+
+      it('should upload root pages using a natural sort order of their `position` values (1 -> 2 -> 3 -> 20)', async () => {
+        const mock = getAPIv2Mock({ authorization })
+          .get(`/branches/stable/${route}/page-1`)
+          .reply(404)
+          .get(`/branches/stable/${route}/page-2`)
+          .reply(404)
+          .get(`/branches/stable/${route}/page-3`)
+          .reply(404)
+          .get(`/branches/stable/${route}/page-4`)
+          .reply(404)
+          .get(`/branches/stable/${route}/page-10`)
+          .reply(404)
+
+          .post(`/branches/stable/${route}`, {
+            slug: 'page-1',
+            title: 'Page 1 (position #1)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            position: 1,
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .post(`/branches/stable/${route}`, {
+            slug: 'page-2',
+            title: 'Page 2 (position #2)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            position: 2,
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .post(`/branches/stable/${route}`, {
+            slug: 'page-3',
+            title: 'Page 3 (position #3)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            position: 3,
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .post(`/branches/stable/${route}`, {
+            slug: 'page-4',
+            title: 'Page 4 (position #4)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            position: 4,
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .post(`/branches/stable/${route}`, {
+            slug: 'page-10',
+            title: 'Page 10 (position #10)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            position: 10,
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {});
+
+        const result = await run(['test/__fixtures__/docs/position-order-natural', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        expect((result.result as unknown as FullUploadResults).created.map(page => page.slug)).toStrictEqual([
+          'page-1',
+          'page-2',
+          'page-3',
+          'page-4',
+          'page-10',
+        ]);
+
+        mock.done();
+      });
+
+      it('should order sibling uploads by ascending position under the same parent', async () => {
+        const mock = getAPIv2Mock({ authorization })
+          .get(`/branches/stable/${route}/parent-hub`)
+          .reply(404)
+          .post(`/branches/stable/${route}`, {
+            slug: 'parent-hub',
+            title: 'Parent hub',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            position: 0,
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+
+          // `child-c`, `child-a`, and `child-b` should not have been uploaded yet.
+          .get(`/branches/stable/${route}/child-a`)
+          .reply(404)
+          .get(`/branches/stable/${route}/child-b`)
+          .reply(404)
+          .get(`/branches/stable/${route}/child-c`)
+          .reply(404)
+
+          // `child-c` should be uploaded first because its position is lowest, then `child-a`
+          // followed by `child-b`
+          .post(`/branches/stable/${route}`, {
+            slug: 'child-c',
+            title: 'Child C - position #1',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            position: 10,
+            parent: { uri: `/branches/stable/${route}/parent-hub` },
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .post(`/branches/stable/${route}`, {
+            slug: 'child-a',
+            title: 'Child A - position #2',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            position: 20,
+            parent: { uri: `/branches/stable/${route}/parent-hub` },
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .post(`/branches/stable/${route}`, {
+            slug: 'child-b',
+            title: 'Child B - position #3',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            position: 30,
+            parent: { uri: `/branches/stable/${route}/parent-hub` },
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {});
+
+        const result = await run(['test/__fixtures__/docs/position-order-siblings', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        expect((result.result as unknown as FullUploadResults).created.map(page => page.slug)).toStrictEqual([
+          'parent-hub',
+          'child-c',
+          'child-a',
+          'child-b',
+        ]);
+
+        mock.done();
+      });
+    });
+
+    describe('given that the direcotry does NOT have explicit frontmatter positions set', () => {
+      it('should upload root pages using a natural sort order of their slugs when `position` is missing', async () => {
+        const mock = getAPIv2Mock({ authorization })
+          .get(`/branches/stable/${route}/page-1`)
+          .reply(404)
+          .get(`/branches/stable/${route}/page-2`)
+          .reply(404)
+          .get(`/branches/stable/${route}/page-3`)
+          .reply(404)
+          .get(`/branches/stable/${route}/page-4`)
+          .reply(404)
+          .get(`/branches/stable/${route}/page-10`)
+          .reply(404)
+
+          .post(`/branches/stable/${route}`, {
+            slug: 'page-1',
+            title: 'Page 1 (position #1)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .post(`/branches/stable/${route}`, {
+            slug: 'page-2',
+            title: 'Page 2 (position #2)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .post(`/branches/stable/${route}`, {
+            slug: 'page-3',
+            title: 'Page 3 (position #3)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .post(`/branches/stable/${route}`, {
+            slug: 'page-4',
+            title: 'Page 4 (position #4)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {})
+          .post(`/branches/stable/${route}`, {
+            slug: 'page-10',
+            title: 'Page 10 (position #10)',
+            category: { uri: `/branches/stable/categories/${route}/category-slug` },
+            content: { body: '\nBody\n' },
+          })
+          .reply(201, {});
+
+        const result = await run(['test/__fixtures__/docs/position-order-missing', '--key', key]);
+
+        expect(result).toMatchSnapshot();
+        expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+        expect((result.result as unknown as FullUploadResults).created.map(page => page.slug)).toStrictEqual([
+          'page-1',
+          'page-2',
+          'page-3',
+          'page-4',
+          'page-10',
+        ]);
+
+        mock.done();
+      });
+
+      it('should treat string `position` values as numbers when ordering uploads', async () => {
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdme-position-string-'));
+        // `writeFileSync` is mocked in this suite; use the promise API to persist fixtures.
+        await fs.promises.writeFile(
+          path.join(tmpDir, 'later.md'),
+          `---
+title: Later
+category:
+  uri: category-slug
+position: "10"
+---
+
+Body
+`,
+        );
+        await fs.promises.writeFile(
+          path.join(tmpDir, 'earlier.md'),
+          `---
+title: Earlier
+category:
+  uri: category-slug
+position: "2"
+---
+
+Body
+`,
+        );
+
+        try {
+          const mock = getAPIv2Mock({ authorization })
+            .get(`/branches/stable/${route}/later`)
+            .reply(404)
+            .get(`/branches/stable/${route}/earlier`)
+            .reply(404)
+            .post(`/branches/stable/${route}`, {
+              slug: 'earlier',
+              title: 'Earlier',
+              category: { uri: `/branches/stable/categories/${route}/category-slug` },
+              position: '2',
+              content: { body: '\nBody\n' },
+            })
+            .reply(201, {})
+            .post(`/branches/stable/${route}`, {
+              slug: 'later',
+              title: 'Later',
+              category: { uri: `/branches/stable/categories/${route}/category-slug` },
+              position: '10',
+              content: { body: '\nBody\n' },
+            })
+            .reply(201, {});
+
+          const result = await run([tmpDir, '--key', key]);
+
+          expect(result.error).toBeUndefined();
+          expect((result.result as unknown as FullUploadResults).created.map(page => page.slug)).toStrictEqual([
+            'earlier',
+            'later',
+          ]);
+
+          mock.done();
+        } finally {
+          fs.rmSync(tmpDir, { recursive: true, force: true });
+        }
+      });
+    });
+
+    it('should error when pages form a cyclic parent chain', async () => {
+      const result = await run(['test/__fixtures__/docs/cyclic-parents', '--key', key]);
+
+      expect(result.error).toBeInstanceOf(Error);
+      expect(result.error?.message).toBe('Cyclic dependency');
+    });
+
+    it('should error out if the directory does not contain any Markdown files', async () => {
+      const result = await run(['test/__fixtures__/ref-oas', '--key', key]);
+
+      expect(result).toMatchSnapshot();
+    });
+
+    it('should handle a mix of valid and invalid and autofixable files', async () => {
+      prompts.inject([true]);
+
+      const result = await run(['test/__fixtures__/docs/mixed-docs', '--key', key]);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).toHaveBeenCalledTimes(5);
+    });
+
+    it('should handle a mix of creates and updates and failures and skipped files', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/stable/${route}/invalid-attributes`)
+        .reply(404)
+        .post(`/branches/stable/${route}`, {
+          category: {
+            uri: `/branches/stable/categories/${route}/some-category-uri`,
+            'is-this-a-valid-property': 'nope',
+          },
+          slug: 'invalid-attributes',
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .reply(201, {})
+        .get(`/branches/stable/${route}/legacy-category`)
+        .reply(200)
+        .patch(`/branches/stable/${route}/legacy-category`, {
+          category: '5ae122e10fdf4e39bb34db6f',
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .reply(201, {})
+        .get(`/branches/stable/${route}/some-slug`)
+        .reply(404)
+        .post(`/branches/stable/${route}`, {
+          slug: 'some-slug',
+          title: 'This is the document title',
+          category: { uri: `/branches/stable/categories/${route}/some-category-uri` },
+          content: { body: '\nBody\n' },
+        })
+        .times(MAX_RETRIES + 1)
+        .reply(500, {})
+        .get(`/branches/stable/${route}/simple-doc`)
+        .reply(404)
+        .post(`/branches/stable/${route}`, {
+          slug: 'simple-doc',
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .times(MAX_RETRIES + 1)
+        .reply(500, {});
+
+      const result = await run(['test/__fixtures__/docs/mixed-docs', '--key', key, '--skip-validation']);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    it('should handle a mix of creates and updates and failures and skipped files and not error out with `max-errors` flag', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/stable/${route}/invalid-attributes`)
+        .reply(404)
+        .post(`/branches/stable/${route}`, {
+          category: {
+            uri: `/branches/stable/categories/${route}/some-category-uri`,
+            'is-this-a-valid-property': 'nope',
+          },
+          slug: 'invalid-attributes',
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .reply(201, {})
+        .get(`/branches/stable/${route}/legacy-category`)
+        .reply(200)
+        .patch(`/branches/stable/${route}/legacy-category`, {
+          category: '5ae122e10fdf4e39bb34db6f',
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .reply(201, {})
+        .get(`/branches/stable/${route}/some-slug`)
+        .reply(404)
+        .post(`/branches/stable/${route}`, {
+          slug: 'some-slug',
+          title: 'This is the document title',
+          category: { uri: `/branches/stable/categories/${route}/some-category-uri` },
+          content: { body: '\nBody\n' },
+        })
+        .times(MAX_RETRIES + 1)
+        .reply(500, {})
+        .get(`/branches/stable/${route}/simple-doc`)
+        .reply(404)
+        .post(`/branches/stable/${route}`, {
+          slug: 'simple-doc',
+          title: 'This is the document title',
+          content: { body: '\nBody\n' },
+        })
+        .times(MAX_RETRIES + 1)
+        .reply(500, {});
+
+      const result = await run([
+        'test/__fixtures__/docs/mixed-docs',
+        '--key',
+        key,
+        '--max-errors',
+        '10',
+        '--skip-validation',
+      ]);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+
+    it('should handle a mix of creates and updates and failures and skipped files (dry run)', async () => {
+      const mock = getAPIv2Mock({ authorization })
+        .get(`/branches/stable/${route}/invalid-attributes`)
+        .reply(404)
+        .get(`/branches/stable/${route}/legacy-category`)
+        .reply(200)
+        .get(`/branches/stable/${route}/some-slug`)
+        .times(MAX_RETRIES + 1)
+        .reply(500)
+        .get(`/branches/stable/${route}/simple-doc`)
+        .times(MAX_RETRIES + 1)
+        .reply(500);
+
+      const result = await run(['test/__fixtures__/docs/mixed-docs', '--key', key, '--dry-run', '--skip-validation']);
+
+      expect(result).toMatchSnapshot();
+      expect(fs.writeFileSync).not.toHaveBeenCalled();
+
+      mock.done();
+    });
+  });
+});

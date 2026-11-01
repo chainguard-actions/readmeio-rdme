@@ -1,0 +1,42 @@
+name: Test openapi reduce (by path and method)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      # act does not run `runs.pre` for local (uses: .) actions; emulate it.
+      - name: Emulate the action's pre step
+        run: node "$GITHUB_WORKSPACE/bin/write-gha-pjson.js"
+      - name: Prepare output directory
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/reduce-out"
+          mkdir -p "$GITHUB_WORKSPACE/reduce-out"
+      - id: action
+        uses: .
+        with:
+          rdme: openapi reduce tests/fixtures/petstore.json --path /pets --method get --out reduce-out/reduced.json
+      - name: Assert reduced file only contains GET /pets
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "output: $ACTUAL"
+          F="$GITHUB_WORKSPACE/reduce-out/reduced.json"
+          if [ ! -f "$F" ]; then
+            echo "FAIL: reduced file not found at $F"
+            exit 1
+          fi
+          cat "$F"
+          RESULT=$(node -e '
+            const s = require(process.argv[1]);
+            const paths = Object.keys(s.paths || {});
+            const methods = Object.keys((s.paths || {})["/pets"] || {}).filter(m => ["get","put","post","delete","patch","options","head","trace"].includes(m));
+            process.stdout.write(paths.join(",") + "|" + methods.join(","));
+          ' "$F")
+          echo "paths|methods: $RESULT"
+          if [ "$RESULT" != "/pets|get" ]; then
+            echo "FAIL: expected '/pets|get'"
+            exit 1
+          fi
+          echo "PASS"

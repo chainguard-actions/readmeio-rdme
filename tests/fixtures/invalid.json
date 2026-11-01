@@ -1,0 +1,10 @@
+{
+  "openapi": "3.0.3",
+  "paths": {
+    "/pets": {
+      "get": {
+        "responses": "not-an-object"
+      }
+    }
+  }
+}

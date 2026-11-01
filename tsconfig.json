@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "declaration": true,
+    "erasableSyntaxOnly": true,
+    "module": "node20",
+    "outDir": "dist/",
+    "rootDir": "src",
+    "skipLibCheck": true,
+    "strict": true,
+    "useUnknownInCatchVariables": false,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["./src/**/*"]
+}

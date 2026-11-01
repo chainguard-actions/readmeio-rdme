@@ -1,0 +1,41 @@
+name: Test openapi validate (valid spec)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      # act does not run `runs.pre` for local (uses: .) actions; the action's pre
+      # step writes dist-gha/package.json, without which oclif falls back to the
+      # root package.json and tries to load the unshipped dist/index.js.
+      - name: Emulate the action's pre step
+        run: node "$GITHUB_WORKSPACE/bin/write-gha-pjson.js"
+      - id: action
+        uses: .
+        with:
+          rdme: openapi validate tests/fixtures/petstore.json
+      - name: Assert output reports a valid definition
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "actual: $ACTUAL"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          if [ -z "$ACTUAL" ]; then
+            echo "FAIL: rdme output is empty"
+            exit 1
+          fi
+          if ! echo "$ACTUAL" | grep -qi "valid"; then
+            echo "FAIL: expected output to mention 'valid'"
+            exit 1
+          fi
+          if echo "$ACTUAL" | grep -qi "invalid"; then
+            echo "FAIL: output says invalid"
+            exit 1
+          fi
+          echo "PASS"

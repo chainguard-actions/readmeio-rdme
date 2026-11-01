@@ -1,0 +1,46 @@
+name: Test openapi convert (Swagger 2.0 -> OpenAPI 3)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      # act does not run `runs.pre` for local (uses: .) actions; emulate it.
+      - name: Emulate the action's pre step
+        run: node "$GITHUB_WORKSPACE/bin/write-gha-pjson.js"
+      - name: Prepare output directory
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/convert-out"
+          mkdir -p "$GITHUB_WORKSPACE/convert-out"
+      - id: action
+        uses: .
+        with:
+          rdme: openapi convert tests/fixtures/swagger.json --out convert-out/converted.json
+      - name: Assert converted file is OpenAPI 3
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "output: $ACTUAL"
+          F="$GITHUB_WORKSPACE/convert-out/converted.json"
+          if [ ! -f "$F" ]; then
+            echo "FAIL: converted file not found at $F"
+            ls -la "$GITHUB_WORKSPACE/convert-out" || true
+            exit 1
+          fi
+          cat "$F"
+          VER=$(node -e 'const s=require(process.argv[1]); process.stdout.write(String(s.openapi||""))' "$F")
+          echo "openapi version: $VER"
+          case "$VER" in
+            3.*) ;;
+            *) echo "FAIL: expected openapi 3.x, got '$VER'"; exit 1 ;;
+          esac
+          if node -e 'const s=require(process.argv[1]); process.exit(s.swagger ? 0 : 1)' "$F"; then
+            echo "FAIL: converted file still has a swagger key"
+            exit 1
+          fi
+          if ! grep -q '/pets' "$F"; then
+            echo "FAIL: expected /pets path in converted file"
+            exit 1
+          fi
+          echo "PASS"
