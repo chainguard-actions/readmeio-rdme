@@ -1,0 +1,47 @@
+name: Test openapi convert (Swagger 2.0 to OpenAPI)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      # act does not execute `runs.pre` for local (uses: .) actions, so run the
+      # action's own pre script (writes dist-gha/package.json) explicitly.
+      - name: Run action pre step (bin/write-gha-pjson.js)
+        run: |
+          node "$GITHUB_WORKSPACE/bin/write-gha-pjson.js"
+          test -f "$GITHUB_WORKSPACE/dist-gha/package.json"
+      - name: Ensure output path is clean
+        run: rm -f "$GITHUB_WORKSPACE/converted-petstore.json"
+      - id: action
+        uses: .
+        with:
+          rdme: openapi convert tests/fixtures/petstore-swagger.json --out converted-petstore.json
+      - name: Assert output message
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          if ! echo "$ACTUAL" | grep -qi "convert"; then
+            echo "FAIL: expected output to mention conversion"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert converted file is OpenAPI
+        run: |
+          F="$GITHUB_WORKSPACE/converted-petstore.json"
+          if [ ! -f "$F" ]; then
+            echo "FAIL: converted file not found at $F"
+            exit 1
+          fi
+          head -c 500 "$F"; echo
+          if ! grep -q '"openapi"' "$F"; then
+            echo "FAIL: converted file lacks an 'openapi' key"
+            exit 1
+          fi
+          if grep -q '"swagger"' "$F"; then
+            echo "FAIL: converted file still has a 'swagger' key"
+            exit 1
+          fi
+          echo "PASS"

@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+import stringArgv from 'string-argv';
+
+import { normalizeStringArgvForGha } from '../dist/lib/normalizeStringArgvForGha.js';
+
+async function main() {
+  /**
+   * Disables the oclif engine warning. For some reason the versions that are flagged are totally
+   * separate from our engines requirements.
+   *
+   * @see {@link https://github.com/oclif/core/blob/70d3f192862a5adb548cbda68c6ee1ca8f724110/src/index.ts#L12}
+   */
+  process.env.OCLIF_DISABLE_ENGINE_WARNING = 'true';
+
+  const { execute } = await import('@oclif/core');
+  const opts = { dir: import.meta.url };
+  if (process.env.INPUT_RDME) {
+    opts.args = normalizeStringArgvForGha(stringArgv(process.env.INPUT_RDME));
+  }
+  await execute(opts).then(msg => {
+    if (msg && typeof msg === 'string') {
+      // oxlint-disable-next-line no-console -- This is in an executable.
+      console.log(msg);
+    }
+  });
+}
+
+main();
