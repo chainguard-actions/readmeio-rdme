@@ -14,6 +14,60 @@ import { getAPIv2Mock, getAPIv2MockForGHA } from '../../helpers/get-api-mock.js'
 import { githubActionsEnv } from '../../helpers/git-mock.js';
 import { runCommand } from '../../helpers/oclif.js';
 
+const { dnsLookup, promptSpy } = vi.hoisted(() => ({
+  dnsLookup: vi.fn<() => Promise<{ address: string; family: number }[]>>(() =>
+    Promise.resolve([{ address: '93.184.216.34', family: 4 }]),
+  ),
+  promptSpy: vi.fn(),
+}));
+
+// Pass-through spy so tests can assert on prompt messages (`prompts.inject` bypasses rendering,
+// so prompt text is otherwise unobservable in captured output).
+vi.mock(import('../../../src/lib/promptWrapper.js'), async importOriginal => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    default: ((...args: Parameters<typeof actual.default>) => {
+      promptSpy(...args);
+      return actual.default(...args);
+    }) as typeof actual.default,
+  };
+});
+
+// `@apidevtools/json-schema-ref-parser` imports `lookup` as a named export from
+// `node:dns/promises` when determining URL safety.
+vi.mock(import('node:dns/promises'), async importOriginal => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    lookup: dnsLookup as unknown as typeof actual.lookup,
+    default: {
+      ...actual.default,
+      lookup: dnsLookup as unknown as typeof actual.lookup,
+    },
+  };
+});
+
+// `HTTPResolver` pins connections via a separate `undici` `fetch` + `Agent` dispatcher.
+// That dispatcher bypasses `nock` and will attempt a real TCP connect to whatever DNS
+// returned (here, our mocked public IP).
+//
+// Route those requests through the global `fetch` (no dispatcher) so `nock` can intercept.
+vi.mock(import('undici'), async importOriginal => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    fetch: ((input: unknown, init?: RequestInit & { dispatcher?: unknown }) => {
+      if (init && 'dispatcher' in init) {
+        const { dispatcher: _dispatcher, ...rest } = init;
+        return globalThis.fetch(input as RequestInfo | URL, rest);
+      }
+
+      return globalThis.fetch(input as RequestInfo | URL, init);
+    }) as unknown as typeof actual.fetch,
+  };
+});
+
 const key = 'rdme_123';
 const branch = '1.0.0';
 const filename = 'test/__fixtures__/petstore-simple-weird-version.json';
@@ -42,6 +96,18 @@ describe('rdme openapi upload', () => {
       const result = await run(['--slug', customSlug, '--legacy-id', legacyId, filename, '--key', key]);
 
       expect(result).toMatchSnapshot();
+    });
+
+    it('should throw if `--timeout` is less than one second', async () => {
+      const result = await run([filename, '--key', key, '--timeout', '0']);
+
+      expect(result.error?.message).toContain('Expected an integer greater than or equal to 1 but received: 0');
+    });
+
+    it('should throw if `--timeout` is more than one hour', async () => {
+      const result = await run([filename, '--key', key, '--timeout', '3601']);
+
+      expect(result.error?.message).toContain('Expected an integer less than or equal to 3600 but received: 3601');
     });
 
     describe('API key validation', () => {
@@ -253,6 +319,65 @@ describe('rdme openapi upload', () => {
 
         mock.done();
       });
+    });
+
+    it('should abort if the user declines overwriting an existing API definition', async () => {
+      prompts.inject([false]);
+      const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+        .get(`/branches/${branch}/apis`)
+        .reply(200, { data: [{ filename: slugifiedFilename }] });
+
+      const result = await run(['--branch', branch, filename, '--key', key, '--slug', slugifiedFilename]);
+
+      expect(result.error).toBeInstanceOf(Error);
+      expect(result.error?.message).toBe('Aborting, no changes were made.');
+
+      mock.done();
+    });
+
+    it('should throw when the upload response is missing a status and URI', async () => {
+      prompts.inject([true]);
+      const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+        .get(`/branches/${branch}/apis`)
+        .reply(200, { data: [] })
+        .post(`/branches/${branch}/apis`)
+        .reply(200, { data: {} });
+
+      const result = await run(['--branch', branch, filename, '--key', key]);
+
+      expect(result.error?.message).toContain('unexpected error');
+
+      mock.done();
+    });
+
+    it('should fail the spinner when the upload request is rejected', async () => {
+      prompts.inject([true]);
+      const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+        .get(`/branches/${branch}/apis`)
+        .reply(200, { data: [] })
+        .post(`/branches/${branch}/apis`)
+        .reply(400, { title: 'Bad request', detail: 'upload exploded' });
+
+      const result = await run(['--branch', branch, filename, '--key', key]);
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.message).toContain('Bad request');
+
+      mock.done();
+    });
+
+    it('should label nested Swagger files in the slug warning', async () => {
+      const swaggerPath = require.resolve('@readme/oas-examples/2.0/json/petstore.json');
+      const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+        .get(`/branches/${branch}/apis`)
+        .reply(200, { data: [] });
+
+      const result = await run(['--branch', branch, swaggerPath, '--key', key, '--dry-run']);
+
+      expect(result.error).toBeUndefined();
+      expect(result.stderr).toContain('This Swagger file is located in a subfolder');
+
+      mock.done();
     });
 
     describe('and the `--slug` flag is passed', () => {
@@ -548,7 +673,7 @@ describe('rdme openapi upload', () => {
         mock.done();
       });
 
-      it('should poll the API and handle timeouts', async () => {
+      it('should poll the API and handle a pending result when the polling window ends', async () => {
         prompts.inject([true]);
         const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
           .get(`/branches/${branch}/apis`)
@@ -569,7 +694,7 @@ describe('rdme openapi upload', () => {
             },
           })
           .get(`/branches/${branch}/apis/${slugifiedFilename}`)
-          .times(25)
+          .times(28)
           .reply(200, {
             data: {
               upload: { status: 'pending' },
@@ -579,6 +704,92 @@ describe('rdme openapi upload', () => {
 
         const result = await run(['--branch', branch, filename, '--key', key]);
 
+        expect(result.error).toBeUndefined();
+        expect(result.result).toStrictEqual({
+          status: 'pending',
+          uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+        });
+        expect(result).toMatchSnapshot();
+
+        mock.done();
+      });
+
+      it('should use a custom polling timeout', async () => {
+        prompts.inject([true]);
+        const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+          .get(`/branches/${branch}/apis`)
+          .reply(200, { data: [] })
+          .post(
+            `/branches/${branch}/apis`,
+            body =>
+              body.match(
+                `form-data; name="schema"; filename="${slugifiedFilename}"\r\nContent-Type: application/json`,
+              ) &&
+              // asserts that we're sending JSON
+              body.match(`{"openapi":"3.0.0","info":{"version":"1.2.3","title":"Single Path",`),
+          )
+          .reply(200, {
+            data: {
+              upload: { status: 'pending' },
+              uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+            },
+          })
+          .get(`/branches/${branch}/apis/${slugifiedFilename}`)
+          .times(2)
+          .reply(200, {
+            data: {
+              upload: { status: 'pending' },
+              uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+            },
+          });
+
+        const result = await run(['--branch', branch, filename, '--key', key, '--timeout', '3']);
+
+        expect(result.error).toBeUndefined();
+        expect(result.result).toStrictEqual({
+          status: 'pending',
+          uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+        });
+
+        mock.done();
+      });
+
+      it('should poll the API and handle a pending update result when the polling window ends', async () => {
+        prompts.inject([true]);
+        const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+          .get(`/branches/${branch}/apis`)
+          .reply(200, { data: [{ filename: slugifiedFilename }] })
+          .put(
+            `/branches/${branch}/apis/${slugifiedFilename}`,
+            body =>
+              body.match(
+                `form-data; name="schema"; filename="${slugifiedFilename}"\r\nContent-Type: application/json`,
+              ) &&
+              // asserts that we're sending JSON
+              body.match(`{"openapi":"3.0.0","info":{"version":"1.2.3","title":"Single Path",`),
+          )
+          .reply(200, {
+            data: {
+              upload: { status: 'pending_update' },
+              uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+            },
+          })
+          .get(`/branches/${branch}/apis/${slugifiedFilename}`)
+          .times(28)
+          .reply(200, {
+            data: {
+              upload: { status: 'pending_update' },
+              uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+            },
+          });
+
+        const result = await run(['--branch', branch, filename, '--key', key]);
+
+        expect(result.error).toBeUndefined();
+        expect(result.result).toStrictEqual({
+          status: 'pending_update',
+          uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+        });
         expect(result).toMatchSnapshot();
 
         mock.done();
@@ -1297,6 +1508,171 @@ describe('rdme openapi upload', () => {
       expect(result).toMatchSnapshot();
 
       getMock.done();
+    });
+  });
+
+  describe('project context in output', () => {
+    it('should include the project subdomain in the overwrite prompt and success message', async () => {
+      prompts.inject([true]);
+      const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+        .get('/projects/me')
+        .reply(200, { data: { name: 'Owl Factory', subdomain: 'owl-factory' } })
+        .get(`/branches/${branch}/apis`)
+        .reply(200, { data: [{ filename: slugifiedFilename }] })
+        .put(`/branches/${branch}/apis/${slugifiedFilename}`)
+        .reply(200, {
+          data: {
+            upload: { status: 'done' },
+            uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+          },
+        });
+
+      const result = await run(['--branch', branch, filename, '--key', key]);
+
+      expect(result.error).toBeUndefined();
+      expect(result.stdout).toContain(
+        `🚀 Your API definition (${slugifiedFilename}) was successfully updated in your owl-factory project in ReadMe!`,
+      );
+      expect(promptSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: `This will overwrite the existing API definition for ${slugifiedFilename} in the owl-factory project. Are you sure you want to continue?`,
+        }),
+      );
+
+      mock.done();
+    });
+
+    it('should include the project subdomain in the still-processing message when polling ends', async () => {
+      prompts.inject([true]);
+      const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+        .get('/projects/me')
+        .reply(200, { data: { name: 'Owl Factory', subdomain: 'owl-factory' } })
+        .get(`/branches/${branch}/apis`)
+        .reply(200, { data: [] })
+        .post(`/branches/${branch}/apis`)
+        .reply(200, {
+          data: {
+            upload: { status: 'pending' },
+            uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+          },
+        })
+        .get(`/branches/${branch}/apis/${slugifiedFilename}`)
+        .times(28)
+        .reply(200, {
+          data: {
+            upload: { status: 'pending' },
+            uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+          },
+        });
+
+      const result = await run(['--branch', branch, filename, '--key', key]);
+
+      expect(result.error).toBeUndefined();
+      expect(result.stdout).toContain(
+        `Your API definition (${slugifiedFilename}) was accepted into your owl-factory project and is still being processed by ReadMe.`,
+      );
+
+      mock.done();
+    });
+
+    it('should treat a project response without a subdomain as unknown', async () => {
+      const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+        .get('/projects/me')
+        .reply(200, { data: { name: 'Owl Factory' } })
+        .get(`/branches/${branch}/apis`)
+        .reply(200, { data: [] });
+
+      const result = await run(['--branch', branch, filename, '--key', key, '--dry-run']);
+
+      expect(result.error).toBeUndefined();
+      expect(result.stdout).toContain('Project: unknown');
+
+      mock.done();
+    });
+
+    it('should include the project in dry-run output', async () => {
+      const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+        .get('/projects/me')
+        .reply(200, { data: { name: 'Owl Factory', subdomain: 'owl-factory' } })
+        .get(`/branches/${branch}/apis`)
+        .reply(200, { data: [] });
+
+      const result = await run(['--branch', branch, filename, '--key', key, '--dry-run']);
+
+      expect(result.error).toBeUndefined();
+      expect(result.stdout).toContain('Project: owl-factory');
+
+      mock.done();
+    });
+
+    it('should show the project as unknown in dry-run output when the project lookup fails', async () => {
+      const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+        .get('/projects/me')
+        .reply(401, { title: 'Unauthorized', status: 401 })
+        .get(`/branches/${branch}/apis`)
+        .reply(200, { data: [] });
+
+      const result = await run(['--branch', branch, filename, '--key', key, '--dry-run']);
+
+      expect(result.error).toBeUndefined();
+      expect(result.stdout).toContain('Project: unknown');
+
+      mock.done();
+    });
+
+    it('should not retry a failing project lookup', async () => {
+      prompts.inject([true]);
+      const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+        .get('/projects/me')
+        .reply(502, 'Bad Gateway')
+        .get(`/branches/${branch}/apis`)
+        .reply(200, { data: [{ filename: slugifiedFilename }] })
+        .put(`/branches/${branch}/apis/${slugifiedFilename}`)
+        .reply(200, {
+          data: {
+            upload: { status: 'done' },
+            uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+          },
+        });
+
+      const result = await run(['--branch', branch, filename, '--key', key]);
+
+      expect(result.error).toBeUndefined();
+      expect(result.stdout).toContain(
+        `🚀 Your API definition (${slugifiedFilename}) was successfully updated in ReadMe!`,
+      );
+
+      mock.done();
+    });
+
+    it('should fall back to the standard messaging when the project lookup fails', async () => {
+      prompts.inject([true]);
+      const mock = getAPIv2Mock({ authorization: `Bearer ${key}` })
+        .get('/projects/me')
+        .reply(401, { title: 'Unauthorized', status: 401 })
+        .get(`/branches/${branch}/apis`)
+        .reply(200, { data: [{ filename: slugifiedFilename }] })
+        .put(`/branches/${branch}/apis/${slugifiedFilename}`)
+        .reply(200, {
+          data: {
+            upload: { status: 'done' },
+            uri: `/branches/${branch}/apis/${slugifiedFilename}`,
+          },
+        });
+
+      const result = await run(['--branch', branch, filename, '--key', key]);
+
+      expect(result.error).toBeUndefined();
+      expect(result.stdout).toContain(
+        `🚀 Your API definition (${slugifiedFilename}) was successfully updated in ReadMe!`,
+      );
+      expect(promptSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: `This will overwrite the existing API definition for ${slugifiedFilename}. Are you sure you want to continue?`,
+        }),
+      );
+
+      mock.done();
     });
   });
 });

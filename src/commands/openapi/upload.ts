@@ -4,6 +4,7 @@ import type {
   APIUploadFailureReason,
   APIUploadSingleResponseRepresentation,
   APIUploadStatus,
+  ProjectRepresentation,
   StagedAPIUploadResponseRepresentation,
 } from '../../lib/types/index.js';
 
@@ -23,6 +24,7 @@ import prepareOas from '../../lib/prepareOas.js';
 import promptTerminal from '../../lib/promptWrapper.js';
 
 const yamlExtensions = ['.yaml', '.yml'];
+const defaultWaitTimeoutSeconds = 12 * 60;
 
 function isNestedLocalSpecPath(specPath: string): boolean {
   return nodePath.dirname(nodePath.normalize(specPath)) !== '.';
@@ -38,6 +40,7 @@ export default class OpenAPIUploadCommand extends BaseCommand<typeof OpenAPIUplo
     'If the spec is a local file, the inferred slug takes the relative path and slugifies it (e.g., the slug for `docs/api/petstore.json` will be `docs-api-petstore.json`).',
     'If the spec is a URL, the inferred slug is the base file name from the URL (e.g., the slug for `https://example.com/docs/petstore.json` will be `petstore.json`).',
     "For the best and most explicit results, we recommend using the `--slug` flag to set a slug for your API definition, especially if you're managing many API definitions at scale.",
+    'If your API definition is still processing when the polling window ends, the command will exit successfully while processing continues in the background.',
   ].join('\n\n');
 
   static args = {
@@ -79,6 +82,14 @@ export default class OpenAPIUploadCommand extends BaseCommand<typeof OpenAPIUplo
         'If included, use the version specified in the `info.version` field in your OpenAPI definition for your ReadMe project version. This flag is mutually exclusive with `--branch`.',
       exclusive: ['branch'],
     }),
+    timeout: Flags.integer({
+      summary: 'Number of seconds to wait for the upload to finish processing.',
+      description:
+        'Must be between 1 and 3,600 seconds. If the API definition is still processing when the timeout is reached, the command will exit successfully while processing continues in the background.',
+      default: defaultWaitTimeoutSeconds,
+      max: 3600,
+      min: 1,
+    }),
     'working-directory': workingDirectoryFlag,
   };
 
@@ -112,22 +123,33 @@ export default class OpenAPIUploadCommand extends BaseCommand<typeof OpenAPIUplo
   }
 
   /**
-   * Poll the ReadMe API until the upload is complete.
+   * Poll the ReadMe API until the upload is complete or the polling window ends.
    */
-  private async pollAPIUntilUploadIsComplete(slug: string, headers: Headers) {
+  private async pollAPIUntilUploadCompletesOrPollingEnds(slug: string, headers: Headers, timeoutSeconds: number) {
     let count = 0;
     let status: APIUploadStatus = 'pending';
     let reason: APIUploadFailureReason | undefined;
+    let elapsedMilliseconds = 0;
+    const timeoutMilliseconds = timeoutSeconds * 1000;
 
     // oxlint-disable no-await-in-loop -- We need to wait between requests to avoid hitting rate limits.
-    while (this.isStatusPending(status) && count < 25) {
-      // oxlint-disable-next-line no-loop-func -- False positive.
+    while (this.isStatusPending(status)) {
+      const remainingMilliseconds = timeoutMilliseconds - elapsedMilliseconds;
+
+      if (remainingMilliseconds <= 0) {
+        break;
+      }
+
+      const pollingDelayMilliseconds = Math.min(1000 * 2 ** count, 30_000, remainingMilliseconds);
+
       await new Promise(resolve => {
-        // exponential backoff — wait 1s, 2s, 4s, 8s, 16s, 32s, 30s, 30s, 30s, 30s, etc.
-        setTimeout(resolve, Math.min(isTest() ? 1 : 1000 * 2 ** count, 30000));
+        // Exponential backoff — wait 1s, 2s, 4s, 8s, 16s, then up to 30s between requests.
+        setTimeout(resolve, isTest() ? 1 : pollingDelayMilliseconds);
       });
 
-      this.debug(`polling API for status of ${slug}, count is ${count}`);
+      elapsedMilliseconds += pollingDelayMilliseconds;
+
+      this.debug(`polling API for status of ${slug}, count is ${count}, timeout is ${timeoutSeconds}s`);
       const response = (await this.readmeAPIFetch(slug, { headers }).then(res =>
         this.handleAPIRes(res),
       )) as APIUploadSingleResponseRepresentation;
@@ -140,10 +162,6 @@ export default class OpenAPIUploadCommand extends BaseCommand<typeof OpenAPIUplo
       count += 1;
     }
     // oxlint-enable no-await-in-loop
-
-    if (this.isStatusPending(status)) {
-      throw new Error('Sorry, this upload timed out. Please try again later.');
-    }
 
     return { status, reason };
   }
@@ -193,9 +211,20 @@ export default class OpenAPIUploadCommand extends BaseCommand<typeof OpenAPIUplo
 
     const headers = new Headers({ authorization: `Bearer ${this.flags.key}` });
 
-    const existingAPIDefinitions: APIDefinitionsRepresentation['data'] =
-      (await this.readmeAPIFetch(`/branches/${branch}/apis`, { headers }).then(res => this.handleAPIRes(res)))?.data ||
-      [];
+    const [project, existingAPIDefinitions] = await Promise.all([
+      // Best-effort lookup of the project this key targets, so output can say where the upload is
+      // going (users have uploaded to the wrong project unknowingly). Must never block the upload.
+      this.readmeAPIFetch('/projects/me', { headers }, { retries: 0 })
+        .then(res => this.handleAPIRes<ProjectRepresentation>(res))
+        .then(res => res?.data?.subdomain ?? null)
+        .catch((e: Error) => {
+          this.debug(`unable to fetch project metadata: ${e.message}`);
+          return null;
+        }),
+      this.readmeAPIFetch(`/branches/${branch}/apis`, { headers })
+        .then(res => this.handleAPIRes<APIDefinitionsRepresentation>(res))
+        .then(res => res?.data || []),
+    ]);
 
     const filenames = new Intl.ListFormat('en', {
       style: 'long',
@@ -360,6 +389,7 @@ export default class OpenAPIUploadCommand extends BaseCommand<typeof OpenAPIUplo
 
       this.log('--- Dry Run Result 🌵 ---');
       this.log(`File slug: ${filename}`);
+      this.log(`Project: ${project || 'unknown'}`);
       this.log(`Branch: ${branch}`);
       this.log(`Spec Type: ${specType}`);
       this.log(`Spec File Type: ${specFileType}`);
@@ -405,7 +435,7 @@ export default class OpenAPIUploadCommand extends BaseCommand<typeof OpenAPIUplo
       const { confirm } = await promptTerminal({
         type: 'confirm',
         name: 'confirm',
-        message: `This will overwrite the existing API definition for ${filename}. Are you sure you want to continue?`,
+        message: `This will overwrite the existing API definition for ${filename}${project ? ` in the ${project} project` : ''}. Are you sure you want to continue?`,
       });
 
       if (!confirm) {
@@ -442,7 +472,11 @@ export default class OpenAPIUploadCommand extends BaseCommand<typeof OpenAPIUplo
 
       if (this.isStatusPending(status)) {
         spinner.text = `${spinner.text} uploaded but not yet processed by ReadMe. Polling for completion...`;
-        ({ status, reason } = await this.pollAPIUntilUploadIsComplete(response.data.uri, headers));
+        ({ status, reason } = await this.pollAPIUntilUploadCompletesOrPollingEnds(
+          response.data.uri,
+          headers,
+          this.flags.timeout,
+        ));
       }
 
       if (this.isStatusFailed(status)) {
@@ -451,10 +485,18 @@ export default class OpenAPIUploadCommand extends BaseCommand<typeof OpenAPIUplo
         }
       }
 
+      if (this.isStatusPending(status)) {
+        spinner.info(`${spinner.text} still processing in the background.`);
+        this.log(
+          `Your API definition (${filename}) was accepted${project ? ` into your ${project} project` : ''} and is still being processed by ReadMe. Processing will continue in the background. Do not retry this upload while it is still processing. Check ReadMe later to confirm that processing completed successfully.`,
+        );
+        return { uri: response.data.uri, status };
+      }
+
       if (status === 'done') {
         spinner.succeed(`${spinner.text} done!`);
         this.log(
-          `🚀 Your API definition (${filename}) was successfully ${method === 'POST' ? 'created' : 'updated'} in ReadMe!`,
+          `🚀 Your API definition (${filename}) was successfully ${method === 'POST' ? 'created' : 'updated'} in ${project ? `your ${project} project in ` : ''}ReadMe!`,
         );
         return { uri: response.data.uri, status };
       }

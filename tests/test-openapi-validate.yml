@@ -1,4 +1,4 @@
-name: Test rdme openapi validate (valid spec)
+name: Test openapi validate (valid spec)
 on:
   workflow_dispatch:
 jobs:
@@ -6,32 +6,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Create dist-gha/package.json (equivalent to pre step write-gha-pjson.js)
+      # act does not execute `runs.pre` for local (`uses: .`) actions. The
+      # action's pre step writes dist-gha/package.json so that oclif resolves
+      # commands from dist-gha/commands.js instead of the (unshipped) dist/.
+      # Run that same shipped pre script here to emulate the real runner.
+      - name: Emulate action pre step (act skips runs.pre for local actions)
         run: |
-          # The action's pre step (bin/write-gha-pjson.js) creates dist-gha/package.json
-          # but pre steps don't run for local actions. We replicate it here using jq.
-          jq '
-            .private = true |
-            .oclif.commands.target = "./commands.js" |
-            .oclif.hooks |= with_entries(.value.target = "./commands.js") |
-            del(.oclif.helpClass) |
-            del(.oclif.plugins)
-          ' package.json > dist-gha/package.json
-          echo "Created dist-gha/package.json"
-      - id: action
-        uses: .
-        continue-on-error: true
-        with:
-          rdme: openapi validate ${{ github.workspace }}/tests/fixtures/petstore.json
-      - name: Assert action succeeded on valid spec
-        env:
-          OUTCOME: ${{ steps.action.outcome }}
-          ACTUAL: ${{ steps.action.outputs.rdme }}
-        run: |
-          echo "outcome: $OUTCOME"
-          echo "actual output: $ACTUAL"
-          if [ "$OUTCOME" != "success" ]; then
-            echo "FAIL: expected action to succeed on valid spec, but got outcome: $OUTCOME"
+          node "$GITHUB_WORKSPACE/bin/write-gha-pjson.js"
+          if [ ! -f "$GITHUB_WORKSPACE/dist-gha/package.json" ]; then
+            echo "FAIL: pre script did not produce dist-gha/package.json"
             exit 1
           fi
-          echo "PASS: action succeeded on valid spec"
+      - id: action
+        uses: .
+        with:
+          rdme: openapi validate tests/fixtures/petstore.json
+      - name: Assert output reports a valid definition
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          if ! echo "$ACTUAL" | grep -q "is a valid"; then
+            echo "FAIL: expected 'is a valid' in output"
+            exit 1
+          fi
+          if ! echo "$ACTUAL" | grep -q "petstore.json"; then
+            echo "FAIL: expected spec path in output"
+            exit 1
+          fi
+          echo "PASS"

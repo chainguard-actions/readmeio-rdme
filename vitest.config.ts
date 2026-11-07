@@ -1,8 +1,24 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { configDefaults, coverageConfigDefaults, defineConfig } from 'vitest/config';
 
+// Always resolve `undici` to the repo-root install. A package-local copy would make
+// `vi.mock('undici')` patch the wrong module while `@apidevtools/json-schema-ref-parser`
+// (bundled into `@readme/openapi-parser`) keeps using a different one, bypassing `nock`.
+const rootUndici = path.resolve(fileURLToPath(new URL('.', import.meta.url)), 'node_modules/undici');
+
 export default defineConfig({
+  resolve: {
+    alias: {
+      undici: rootUndici,
+    },
+  },
   test: {
     coverage: {
+      // Vitest 5 matches include/exclude against project-relative paths and no longer
+      // ships a default exclude list, so pin coverage to source files.
+      include: ['src'],
       exclude: [...coverageConfigDefaults.exclude, '**/dist-gha/**'],
     },
     // We'll defer to `@oclif/test` for console interception
@@ -30,6 +46,13 @@ export default defineConfig({
       ...configDefaults.exclude,
     ],
     globalSetup: 'test/helpers/global-setup.ts',
+    server: {
+      deps: {
+        // Ensure OpenAPI URL fetches go through Vitest's module graph so our
+        // `vi.mock('undici')` / `vi.mock('node:dns/promises')` patches apply.
+        inline: ['@readme/openapi-parser', 'oas-normalize'],
+      },
+    },
     watchTriggerPatterns: [
       {
         pattern: /test\/__fixtures__\/([A-z,-]+)\/([A-z,-/.]+)/g,

@@ -1,3 +1,119 @@
+# [10.10.0](https://github.com/readmeio/rdme/compare/v10.9.6...v10.10.0) (2026-11-01)
+
+
+### Bug Fixes
+
+* Disable javascript execution in 2nd frontmatter ([#1518](https://github.com/readmeio/rdme/issues/1518)) ([922cbde](https://github.com/readmeio/rdme/commit/922cbde6877dc82b610cd787a049d49be851b821))
+* empty commit to force a release ([779c812](https://github.com/readmeio/rdme/commit/779c812f8a92dc5ce63cb168d9631f7ed5af2a63))
+* **export:** honor --docs-only when skipping empty pages ([#1523](https://github.com/readmeio/rdme/issues/1523)) ([2c89dec](https://github.com/readmeio/rdme/commit/2c89dec88f60a329ba98189724b4ae1076b5e0e8))
+* issue where child pages could be uploaded before their parents ([#1554](https://github.com/readmeio/rdme/issues/1554)) ([8ad0fd2](https://github.com/readmeio/rdme/commit/8ad0fd200f78a84288c8e821c7ece68280bb9771))
+* **openapi:** treat pending uploads as accepted ([#1515](https://github.com/readmeio/rdme/issues/1515)) ([757950c](https://github.com/readmeio/rdme/commit/757950ce49652bd36a95c4cdf04b757b28a907a1))
+
+
+### Features
+
+* **glossary:** add upload and export commands ([#1533](https://github.com/readmeio/rdme/issues/1533)) ([2b49b61](https://github.com/readmeio/rdme/commit/2b49b61db32aedd0547356697bc567516b78f911))
+* **openapi:** add configurable upload timeout ([#1516](https://github.com/readmeio/rdme/issues/1516)) ([8c44efe](https://github.com/readmeio/rdme/commit/8c44efe12a399a4088edb289d810e5a20d60028f))
+* **openapi:** surface target project in upload output ([#1520](https://github.com/readmeio/rdme/issues/1520)) ([53579cc](https://github.com/readmeio/rdme/commit/53579ccd931b66628ac1dc7debad168d50aa221b))
+
+# [10.10.0-next.6](https://github.com/readmeio/rdme/compare/v10.10.0-next.5...v10.10.0-next.6) (2026-11-01)
+
+
+### Bug Fixes
+
+* issue where child pages could be uploaded before their parents ([#1554](https://github.com/readmeio/rdme/issues/1554)) ([8ad0fd2](https://github.com/readmeio/rdme/commit/8ad0fd200f78a84288c8e821c7ece68280bb9771))
+
+# [10.10.0-next.5](https://github.com/readmeio/rdme/compare/v10.10.0-next.4...v10.10.0-next.5) (2026-10-31)
+
+
+### Features
+
+* **glossary:** add upload and export commands ([#1533](https://github.com/readmeio/rdme/issues/1533)) ([2b49b61](https://github.com/readmeio/rdme/commit/2b49b61db32aedd0547356697bc567516b78f911))
+
+# [10.10.0-next.4](https://github.com/readmeio/rdme/compare/v10.10.0-next.3...v10.10.0-next.4) (2026-08-31)
+
+
+### Bug Fixes
+
+* **export:** honor --docs-only when skipping empty pages ([#1523](https://github.com/readmeio/rdme/issues/1523)) ([2c89dec](https://github.com/readmeio/rdme/commit/2c89dec88f60a329ba98189724b4ae1076b5e0e8))
+
+# [10.10.0-next.3](https://github.com/readmeio/rdme/compare/v10.10.0-next.2...v10.10.0-next.3) (2026-08-25)
+
+
+### Features
+
+* **openapi:** surface target project in upload output ([#1520](https://github.com/readmeio/rdme/issues/1520)) ([53579cc](https://github.com/readmeio/rdme/commit/53579ccd931b66628ac1dc7debad168d50aa221b))
+
+# [10.10.0-next.2](https://github.com/readmeio/rdme/compare/v10.10.0-next.1...v10.10.0-next.2) (2026-08-17)
+
+
+### Bug Fixes
+
+* Disable javascript execution in 2nd frontmatter ([#1518](https://github.com/readmeio/rdme/issues/1518)) ([922cbde](https://github.com/readmeio/rdme/commit/922cbde6877dc82b610cd787a049d49be851b821))
+
+# [10.10.0-next.1](https://github.com/readmeio/rdme/compare/v10.9.7-next.1...v10.10.0-next.1) (2026-08-12)
+
+
+### Features
+
+* **openapi:** add configurable upload timeout ([#1516](https://github.com/readmeio/rdme/issues/1516)) ([8c44efe](https://github.com/readmeio/rdme/commit/8c44efe12a399a4088edb289d810e5a20d60028f))
+
+## [10.9.7-next.1](https://github.com/readmeio/rdme/compare/v10.9.6...v10.9.7-next.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* **openapi:** treat pending uploads as accepted ([#1515](https://github.com/readmeio/rdme/issues/1515)) ([757950c](https://github.com/readmeio/rdme/commit/757950ce49652bd36a95c4cdf04b757b28a907a1))
+
+## [10.9.6](https://github.com/readmeio/rdme/compare/v10.9.5...v10.9.6) (2026-08-06)
+
+
+### Bug Fixes
+
+* empty commit to force a release ([ff709c7](https://github.com/readmeio/rdme/commit/ff709c73c46e01eb03dda8a5d051c5c945541073))
+* empty commit to force a release ([2d2b204](https://github.com/readmeio/rdme/commit/2d2b204e9b19f0fd6b47dfed0b8c309e0bfc8f54))
+* empty commit to force a release ([c278eb7](https://github.com/readmeio/rdme/commit/c278eb7ffde95244e42f1fdc4714f891ee3b4079))
+* **gha:** bundle undici for OpenAPI URL uploads ([#1514](https://github.com/readmeio/rdme/issues/1514)) ([322ef94](https://github.com/readmeio/rdme/commit/322ef94fa83dfc0c172ea65822589632a82b5e7f)), closes [#1513](https://github.com/readmeio/rdme/issues/1513)
+
+## [10.9.6-next.1](https://github.com/readmeio/rdme/compare/v10.9.5...v10.9.6-next.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* empty commit to force a release ([2d2b204](https://github.com/readmeio/rdme/commit/2d2b204e9b19f0fd6b47dfed0b8c309e0bfc8f54))
+* empty commit to force a release ([c278eb7](https://github.com/readmeio/rdme/commit/c278eb7ffde95244e42f1fdc4714f891ee3b4079))
+* **gha:** bundle undici for OpenAPI URL uploads ([#1514](https://github.com/readmeio/rdme/issues/1514)) ([322ef94](https://github.com/readmeio/rdme/commit/322ef94fa83dfc0c172ea65822589632a82b5e7f)), closes [#1513](https://github.com/readmeio/rdme/issues/1513)
+
+## [10.9.5](https://github.com/readmeio/rdme/compare/v10.9.4...v10.9.5) (2026-08-05)
+
+
+### Bug Fixes
+
+* empty commit to force a release ([d4ea864](https://github.com/readmeio/rdme/commit/d4ea864d58ec5492452ab4727b56e9e7c34a0209))
+* **openapi:** improved protections against retrieving invalid URLs ([#1512](https://github.com/readmeio/rdme/issues/1512)) ([cd28601](https://github.com/readmeio/rdme/commit/cd286011695461aa718370cd3b38fd03a308596f))
+
+## [10.9.5-next.1](https://github.com/readmeio/rdme/compare/v10.9.4...v10.9.5-next.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* **openapi:** improved protections against retrieving invalid URLs ([#1512](https://github.com/readmeio/rdme/issues/1512)) ([cd28601](https://github.com/readmeio/rdme/commit/cd286011695461aa718370cd3b38fd03a308596f))
+
+## [10.9.4](https://github.com/readmeio/rdme/compare/v10.9.3...v10.9.4) (2026-08-03)
+
+
+### Bug Fixes
+
+* empty commit to force a release ([d25c11d](https://github.com/readmeio/rdme/commit/d25c11d7d483fab56f97000574fd30bad8eee628))
+* **openapi:** upgrade our bundler to resolver issues with `$ref` resolutions ([#1499](https://github.com/readmeio/rdme/issues/1499)) ([ae74f2b](https://github.com/readmeio/rdme/commit/ae74f2bd955c26b13253bafd3987a944a586c3a7))
+
+## [10.9.4-next.1](https://github.com/readmeio/rdme/compare/v10.9.3...v10.9.4-next.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* **openapi:** upgrade our bundler to resolver issues with `$ref` resolutions ([#1499](https://github.com/readmeio/rdme/issues/1499)) ([ae74f2b](https://github.com/readmeio/rdme/commit/ae74f2bd955c26b13253bafd3987a944a586c3a7))
+
 ## [10.9.3](https://github.com/readmeio/rdme/compare/v10.9.2...v10.9.3) (2026-07-17)
 
 
