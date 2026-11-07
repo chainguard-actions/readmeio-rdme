@@ -8,7 +8,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 | Version | Tag | Upstream commit | Hardening report |
 |---------|-----|-----------------|------------------|
-| v10 | [`v10`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10) | [`2ba9190`](https://github.com/readmeio/rdme/commit/2ba919093bf3e008ce09a1d56c9b2a9982cbd7d9) | [`HARDENING.md`](https://github.com/chainguard-actions/readmeio-rdme/blob/v10/HARDENING.md) |
+| v10 | [`v10`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10) | [`9bcf379`](https://github.com/readmeio/rdme/commit/9bcf3796d4d9d25c7b216b7db309707b2936737d) | [`HARDENING.md`](https://github.com/chainguard-actions/readmeio-rdme/blob/v10/HARDENING.md) |
 | v10.10.0 | [`v10.10.0`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.10.0) | [`9bcf379`](https://github.com/readmeio/rdme/commit/9bcf3796d4d9d25c7b216b7db309707b2936737d) | [`HARDENING.md`](https://github.com/chainguard-actions/readmeio-rdme/blob/v10.10.0/HARDENING.md) |
 | v10.10.0-next.1 | [`v10.10.0-next.1`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.10.0-next.1) | [`7d4c97c`](https://github.com/readmeio/rdme/commit/7d4c97cec5bd208ae9b68b584524cc5086a9e17f) | [`HARDENING.md`](https://github.com/chainguard-actions/readmeio-rdme/blob/v10.10.0-next.1/HARDENING.md) |
 | v10.10.0-next.3 | [`v10.10.0-next.3`](https://github.com/chainguard-actions/readmeio-rdme/tree/v10.10.0-next.3) | [`750fc4a`](https://github.com/readmeio/rdme/commit/750fc4ad47b4abe70d8ec5b594319a5d8dccf9da) | [`HARDENING.md`](https://github.com/chainguard-actions/readmeio-rdme/blob/v10.10.0-next.3/HARDENING.md) |
