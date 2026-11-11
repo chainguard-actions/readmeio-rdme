@@ -1,0 +1,26 @@
+name: Test openapi validate on a Swagger 2.0 definition
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      # act does not run `runs.pre` for local (uses: .) actions; run the action's
+      # own pre script so dist-gha/package.json exists, as it would on GitHub.
+      - name: Run action pre step (skipped by act for local actions)
+        run: node bin/write-gha-pjson.js
+      - id: action
+        uses: .
+        with:
+          rdme: openapi validate tests/fixtures/petstore-swagger.json
+      - name: Assert output reports valid Swagger
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          if ! echo "$ACTUAL" | grep -q "is a valid Swagger API definition"; then
+            echo "FAIL: expected 'is a valid Swagger API definition' in output"
+            exit 1
+          fi
+          echo "PASS"
