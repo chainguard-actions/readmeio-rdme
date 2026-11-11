@@ -1,0 +1,30 @@
+name: Test openapi validate (valid OpenAPI 3)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run the action's pre step (act does not run runs.pre for local actions)
+        run: |
+          node "$GITHUB_WORKSPACE/bin/write-gha-pjson.js"
+          test -f "$GITHUB_WORKSPACE/dist-gha/package.json"
+      - id: action
+        uses: .
+        with:
+          rdme: openapi validate tests/fixtures/petstore-openapi.json
+      - name: Assert output reports valid OpenAPI definition
+        env:
+          ACTUAL: ${{ steps.action.outputs.rdme }}
+        run: |
+          echo "actual: $ACTUAL"
+          if ! echo "$ACTUAL" | grep -q "petstore-openapi.json"; then
+            echo "FAIL: output does not mention the spec file"
+            exit 1
+          fi
+          if ! echo "$ACTUAL" | grep -qi "valid OpenAPI"; then
+            echo "FAIL: expected a 'valid OpenAPI' message"
+            exit 1
+          fi
+          echo "PASS"
